@@ -1,5 +1,6 @@
 import functools
 import logging
+import signal
 import sys
 import traceback
 from pathlib import Path
@@ -87,6 +88,14 @@ def pair_stats_between_experiments(experiment_name_1, experiment_name_2):
         print('Wilcoxon p-value of ', p_w)
         print('Mann-Whitney p-value of ', p_mn)
 
+def save_current_info(signal, frame):
+    print('Captured exit signal')
+    if 'SEED_CONTROLLER' in globals():
+        print('Saving SEED_CONTROLLER to {}'.format(DEFAULT_SEED_FILE))
+        SEED_CONTROLLER.dump(DEFAULT_SEED_FILE, overwrite=True)
+    exit(0)
+
+
 def setup_server_handlers(server):
     request_handlers = {}
     response_handlers = {}
@@ -108,6 +117,9 @@ def start_server():
     handlers, resp_methods = setup_server_handlers(server)
 
     print("I: Service is ready at %s" % endpoint)
+    # Setup interrupt handler
+    signal.signal(signal.SIGINT, save_current_info)
+
     while True:
         request = server.recv_pyobj()
         if not request:
