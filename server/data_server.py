@@ -48,7 +48,10 @@ def _dataset_hash(train_set, test_set):
 
 # TODO: Challenges (or another class) should provide a method accepting a seed and deterministically return the train/test sets instead of defining it here
 @functools.lru_cache()
-def prepare_data_for_run(challenge: str, run: int, seed: int, train_batch_size: int, test_batch_size: int, **kwargs):
+def prepare_data_for_run(challenge: str, experiment_name: str, run: int, seed: int, train_batch_size: int, test_batch_size: int, **kwargs):
+    # Verify seeds are coordinated
+    assert seed == find_experiment_random_states(experiment_name=experiment_name)[run]
+
     challenge = CHALLENGES[challenge]
     train_loader, test_loader = challenge.get_subset(run=run, seed=seed,
                                                      train_batch_size=train_batch_size,
@@ -76,7 +79,7 @@ def send_array(socket, A, flags=0, copy=True, track=False):
 def find_experiment_random_states(**kwargs):
     experiment_name = kwargs['experiment_name']
     random_state = SEED_CONTROLLER.get_random_states(experiment_name)
-    print('Random states for {} are {}'.format(experiment_name, random_state))
+    # print('Random states for {} are {}'.format(experiment_name, random_state))
     return random_state
 
 

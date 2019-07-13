@@ -180,7 +180,7 @@ def run_experiment():
         logger.current_run = run
         
         logger.status('Requesting data from server')
-        train_data, test_data = server_interactions.prepare_data_for_run(socket, run, seed[run], data_params)
+        train_data, test_data = server_interactions.prepare_data_for_run(socket, EXPERIMENT_NAME, run, seed[run], data_params)
         logger.status('Received data from server')
 
         model = x.to(device)
