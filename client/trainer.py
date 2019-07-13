@@ -1,22 +1,18 @@
-import torch
-import zmq
 import argparse
 import logging
-import torch.optim as optim
-import torch.nn as nn
-import torch.nn.functional as F
-from pathlib import Path
-import numpy as np
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from collections import namedtuple
 
-# TODO: Put this in its own package
-MetricsDTO = namedtuple('MetricsDTO', 'accuracy precision recall f1_score')
-def metrics_dto_str(metrics_dto: MetricsDTO) -> str:
-    s = 'accuracy: {} - precision: {} - recall: {} - f1: {}'.format(metrics_dto.accuracy, metrics_dto.precision, metrics_dto.recall, metrics_dto.f1_score)
-    return s
-
-DEFAULT_LOG_DIR = '.'
+import numpy as np
+import server_interactions
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+import zmq
+from experiment_logger import ExperimentLogger
+from metrics_dto import create_metrics_dto, metrics_dto_str
+from sklearn.metrics import (accuracy_score, f1_score, precision_score,
+                             recall_score)
 
 
 class Net(nn.Module):
@@ -53,54 +49,6 @@ def set_local_seed(seed_info, **kwargs):
         np.random.seed(seed_info)
     if 'np' in globals():
         np.random.seed(seed_info)
-
-class ExperimentLogger(object):
-    def __init__(self, experiment_name, **kwargs):
-        self.name = experiment_name
-        self.current_run = 0
-        self.base_logger = logging.getLogger()
-        self.bp = Path(kwargs.get('log_dir', DEFAULT_LOG_DIR))
-        assert self.bp.exists()
-        # Need to cast to str because of python 3.5
-        self._training_log_handler = logging.FileHandler(str(self.bp / '{}.training.log'.format(self.name)))
-        
-        self.train_logger = self.base_logger.getChild('training')
-        self.train_logger.addHandler(self._training_log_handler)
-        self.train_logger.setLevel(logging.DEBUG)
-        
-        self.parameters_logger = self.base_logger.getChild('parameter')
-        # Need to cast to str because of python 3.5
-        self._parameter_log_handler = logging.FileHandler(str(self.bp / '{}.parameters.log'.format(self.name)))
-        self.parameters_logger.addHandler(self._parameter_log_handler)
-        self.parameters_logger.setLevel(logging.DEBUG)
-
-        self.metrics_logger = self.base_logger.getChild('metrics')
-        # Need to cast to str because of python 3.5
-        self.metrics_log_handler = logging.FileHandler(str(self.bp / '{}.metrics.log'.format(self.name)))
-        self.metrics_logger.addHandler(self.metrics_log_handler)
-        self.metrics_logger.setLevel(logging.DEBUG)
-
-        self.base_logger.setLevel(logging.DEBUG)
-        self.base_log_handler = logging.StreamHandler()
-        self.base_log_handler.setFormatter(logging.Formatter('%(asctime)s | %(name)s | %(message)s'))
-        self.base_logger.addHandler(self.base_log_handler)
-
-
-    def train(self, *args, **kwargs):
-        self.train_logger.debug('run {}'.format(self.current_run))
-        self.train_logger.debug(*args, **kwargs)
-
-    def parameters(self, *args, **kwargs):
-        self.parameters_logger.debug('run {}'.format(self.current_run))
-        self.parameters_logger.debug(*args, **kwargs)
-
-    def metrics(self, *args, **kwargs):
-        self.metrics_logger.debug('run {}'.format(self.current_run))
-        self.metrics_logger.debug(*args, **kwargs)
-    
-    def status(self, *args, **kwargs):
-        self.base_logger.debug(*args, **kwargs)
-
 
 class ChallengeRunIdentifier(dict):
     props = ['challenge', 'run', 'seed']
@@ -164,63 +112,6 @@ def test(args, model, device, test_loader, logger):
     return np_pred, np_target
 
 
-def metrics_dto(predictions, target) -> MetricsDTO:
-    np_pred = predictions
-    if isinstance(np_pred, list):
-        np_pred = np.array(np_pred)
-    np_pred, np_target= np_pred.ravel(), target.ravel()
-    acc, pr, rec, f1 = accuracy_score(y_true=np_target, y_pred=np_pred), precision_score(y_true=np_target, y_pred=np_pred, average='macro'), recall_score(y_true=np_target, y_pred=np_pred, average='macro'), f1_score(y_true=np_target, y_pred=np_pred, average='macro')
-    return MetricsDTO(accuracy=acc, precision=pr, recall=rec, f1_score=f1)
-
-def send_metrics_for_run(socket, experiment_name: str, seed: int, run: int, metrics_dto: MetricsDTO):
-    metrics_obj = create_calculated_metrics_message(experiment_name=experiment_name, run=run, challenge='mnist', seed=seed, metrics=metrics_dto)
-    socket.send_pyobj(metrics_obj)
-    # Receive response
-    obj = socket.recv_pyobj()
-    if not obj:
-        # TODO: Custom exception
-        raise Exception('Metrics were not synced')
-
-
-def create_calculated_metrics_message(experiment_name: str, run: int, challenge: str, seed: int, metrics: MetricsDTO):
-    # TODO: Just send the DTO (implies making a middle package)
-    obj = {'type': 'metrics', 'experiment_name': experiment_name, 'challenge': challenge, 'run': run, 'seed': seed, 'value': metrics._asdict()}
-    return obj
-
-
-# TODO: Create a clean interface object (ex: DTO)
-def create_data_query(run: int, challenge: str, seed: int, data_params: dict):
-    obj = {'type': 'data', 'challenge': challenge, 'run': run, 'seed': seed, **data_params}
-    return obj
-
-def prepare_data_for_run(socket, run: int, seed: int,  data_params: dict):
-    socket.send_pyobj(create_data_query(challenge='mnist', run=run, seed=seed, data_params=data_params))
-    msg = socket.recv_pyobj()
-    train_data, test_data = msg
-    # print(train_data[0].shape, train_data[1].shape)
-    return train_data, test_data
-
-
-def request_seed(socket, experiment_name):
-    req = {'type': 'seed', 'experiment_name': experiment_name}
-    socket.send_pyobj(req)
-    seed_info = socket.recv_pyobj()
-    return seed_info
-
-
-def set_server_seed(socket, EXPERIMENT_NAME, seed):
-    request = {'type': 'seed', 'seed': seed, 'experiment_name': EXPERIMENT_NAME}
-    try:
-        socket.send_pyobj(request)
-        resp = socket.recv_pyobj()
-    except Exception as e:
-        print('Failed with', e)
-        raise e
-    else:
-        print(resp)
-        if not isinstance(resp, bool):
-            raise ValueError("Failed to set seed on server:", resp)
-
 def parse_args():
     # Training settings
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
@@ -247,7 +138,8 @@ def parse_args():
                         help='For Saving the current Model')
     args = parser.parse_args()
     return vars(args)
-    
+
+
 def run_experiment():
     args = parse_args()
     print(args)
@@ -274,7 +166,7 @@ def run_experiment():
     socket, context = connect_server('tcp://localhost:90002')
 
     # Request server for seed
-    seed = request_seed(socket, EXPERIMENT_NAME)
+    seed = server_interactions.request_seed(socket, EXPERIMENT_NAME)
     logger.status('Using seed value {}'.format(seed))
 
     for run in range(args['runs']):
@@ -288,7 +180,7 @@ def run_experiment():
         logger.current_run = run
         
         logger.status('Requesting data from server')
-        train_data, test_data = prepare_data_for_run(socket, run, seed[run], data_params)
+        train_data, test_data = server_interactions.prepare_data_for_run(socket, run, seed[run], data_params)
         logger.status('Received data from server')
 
         model = x.to(device)
@@ -300,14 +192,15 @@ def run_experiment():
             np_pred, np_target = test(args, model, device, test_data, logger=logger)
 
         # TODO (opt): Put an option if we want per epoch or per run stats
-        metrics = metrics_dto(predictions=np_pred, target=np_target)
+        metrics = create_metrics_dto(predictions=np_pred, target=np_target)
         logger.metrics(metrics_dto_str(metrics))
         logger.status('Sending metrics to server')
-        send_metrics_for_run(socket, EXPERIMENT_NAME, seed, run, metrics)
+        server_interactions.send_metrics_for_run(socket, EXPERIMENT_NAME, seed, run, metrics)
 
         if (args['save_model']):
             torch.save(model.state_dict(), "mnist_cnn_{}.pt".format(args['type']))
         log_params(model, logger)
+
 
 def recv_array(socket, flags=0, copy=True, track=False):
     """recv a numpy array"""
@@ -324,6 +217,7 @@ def connect_server(endpoint):
     socket = context.socket(zmq.PAIR)
     socket.connect(endpoint)
     return socket, context
+
 
 if __name__ == "__main__":
     run_experiment()
