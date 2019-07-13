@@ -46,6 +46,8 @@ def _dataset_hash(train_set, test_set):
     h_msg = 'Train x: {} - Train y: {} - Test x: {} - Test y: {}'.format(*[hash(bytes(x)) for x in [*train_set, *test_set]])
     return h_msg
 
+# TODO: lru_cache's key are the parameters which are currently changing depending on various factors, if a custom
+# object is created, not only would we reduce the number of parameters, we would benefit from a consistent hash value
 # TODO: Challenges (or another class) should provide a method accepting a seed and deterministically return the train/test sets instead of defining it here
 @functools.lru_cache()
 def prepare_data_for_run(challenge: str, experiment_name: str, run: int, seed: int, train_batch_size: int, test_batch_size: int, **kwargs):
