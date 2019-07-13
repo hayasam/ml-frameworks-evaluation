@@ -117,7 +117,7 @@ def initialize_layer_weights(module):
 def train(args, model, device, train_loader, optimizer, epoch, logger):
     model.train()
     train_x, train_y = train_loader
-    print(train_x.shape, train_y.shape)
+    # print(train_x.shape, train_y.shape)
     for batch_idx, (np_data, np_target) in enumerate(zip(train_x, train_y)):
         data, target = torch.from_numpy(np_data), torch.from_numpy(np_target)
         data, target = data.to(device), target.to(device)
@@ -157,7 +157,7 @@ def test(args, model, device, test_loader, logger):
 
     np_pred = np.array(preds).ravel()
     np_target = test_y.ravel()
-    print('Output shape', np_target.shape, 'Pred shape', np_pred.shape)
+    # print('Output shape', np_target.shape, 'Pred shape', np_pred.shape)
     acc, pr, rec, f1 = accuracy_score(y_true=np_target, y_pred=np_pred), precision_score(y_true=np_target, y_pred=np_pred, average='macro'), recall_score(y_true=np_target, y_pred=np_pred, average='macro'), f1_score(y_true=np_target, y_pred=np_pred, average='macro')
     metrics_msg = 'accuracy: {} - precision: {} - recall: {} - f1: {}'.format(acc, pr, rec, f1)
     logger.train(metrics_msg)
@@ -196,11 +196,8 @@ def create_data_query(run: int, challenge: str, seed: int, data_params: dict):
 def prepare_data_for_run(socket, run: int, seed: int,  data_params: dict):
     socket.send_pyobj(create_data_query(challenge='mnist', run=run, seed=seed, data_params=data_params))
     msg = socket.recv_pyobj()
-    print('=======')
-    print(msg)
-    print('=======')
     train_data, test_data = msg
-    print(train_data[0].shape, train_data[1].shape)
+    # print(train_data[0].shape, train_data[1].shape)
     return train_data, test_data
 
 
@@ -283,6 +280,7 @@ def run_experiment():
     for run in range(args['runs']):
         # Local seed is indexed at the run
         set_local_seed(seed[run])
+        # Recreate the net for each run with new initial weights
         x = Net()
         x.apply(initialize_layer_weights)
         device = torch.device("cuda" if args['use_cuda'] else "cpu")
