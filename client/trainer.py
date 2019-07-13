@@ -6,6 +6,15 @@ import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
 from pathlib import Path
+import numpy as np
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from collections import namedtuple
+
+# TODO: Put this in its own package
+MetricsDTO = namedtuple('MetricsDTO', 'accuracy precision recall f1_score')
+def metrics_dto_str(metrics_dto: MetricsDTO) -> str:
+    s = 'accuracy: {} - precision: {} - recall: {} - f1: {}'.format(metrics_dto.accuracy, metrics_dto.precision, metrics_dto.recall, metrics_dto.f1_score)
+    return s
 
 DEFAULT_LOG_DIR = '.'
 
@@ -43,7 +52,7 @@ def set_seed(seed_info, **kwargs):
     if 'numpy' in globals():
         np.random.seed(seed_info)
     if 'np' in globals():
-        np.random(seed_info)
+        np.random.seed(seed_info)
 
 class ExperimentLogger(object):
     def __init__(self, experiment_name, **kwargs):
@@ -93,6 +102,14 @@ class ExperimentLogger(object):
         self.base_logger.debug(*args, **kwargs)
 
 
+class ChallengeRunIdentifier(dict):
+    props = ['challenge', 'run', 'seed']
+    @classmethod
+    def from_values(cls, **kwargs):
+        _underlying = {k:v for k,v in kwargs.items() if k in ChallengeRunIdentifier.props}
+        return cls(_underlying)
+
+
 def initialize_layer_weights(module):
     if hasattr(module, 'weight') and isinstance(module.weight, torch.nn.parameter.Parameter):
         torch.nn.init.xavier_uniform_(module.weight)
@@ -120,6 +137,7 @@ def test(args, model, device, test_loader, logger):
     test_loss = 0
     correct = 0
     test_x, test_y = test_loader
+    preds = []
     with torch.no_grad():
         for np_data, np_target in zip(test_x, test_y):
             data, target = torch.from_numpy(np_data), torch.from_numpy(np_target)
@@ -128,13 +146,47 @@ def test(args, model, device, test_loader, logger):
             test_loss += F.nll_loss(output, target, reduction='sum').item() # sum up batch loss
             pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
+            preds.append(pred.cpu().numpy())
     total_n_examples = test_y.size  # test_x.shape[0] * test_x.shape[1]
     test_loss /= total_n_examples
 
     message = '\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, total_n_examples,
         100. * correct / total_n_examples)
-    logger.metrics(message)
+    logger.train(message)
+
+    np_pred = np.array(preds).ravel()
+    np_target = test_y.ravel()
+    print('Output shape', np_target.shape, 'Pred shape', np_pred.shape)
+    acc, pr, rec, f1 = accuracy_score(y_true=np_target, y_pred=np_pred), precision_score(y_true=np_target, y_pred=np_pred, average='macro'), recall_score(y_true=np_target, y_pred=np_pred, average='macro'), f1_score(y_true=np_target, y_pred=np_pred, average='macro')
+    metrics_msg = 'accuracy: {} - precision: {} - recall: {} - f1: {}'.format(acc, pr, rec, f1)
+    logger.train(metrics_msg)
+    return np_pred, np_target
+
+
+def metrics_dto(predictions, target) -> MetricsDTO:
+    np_pred = predictions
+    if isinstance(np_pred, list):
+        np_pred = np.array(np_pred)
+    np_pred, np_target= np_pred.ravel(), target.ravel()
+    acc, pr, rec, f1 = accuracy_score(y_true=np_target, y_pred=np_pred), precision_score(y_true=np_target, y_pred=np_pred, average='macro'), recall_score(y_true=np_target, y_pred=np_pred, average='macro'), f1_score(y_true=np_target, y_pred=np_pred, average='macro')
+    return MetricsDTO(accuracy=acc, precision=pr, recall=rec, f1_score=f1)
+
+def send_metrics_for_run(socket, experiment_name: str, seed: int, run: int, metrics_dto: MetricsDTO):
+    metrics_obj = create_calculated_metrics_message(run, challenge='mnist', seed=seed, metrics=metrics_dto)
+    socket.send_pyobj(metrics_obj)
+    # Receive response
+    obj = socket.recv_pyobj()
+    if not obj:
+        # TODO: Custom exception
+        raise Exception('Metrics were not synced')
+
+
+def create_calculated_metrics_message(run: int, challenge: str, seed: int, metrics: MetricsDTO):
+    # TODO: Just send the DTO (implies making a middle package)
+    obj = {'type': 'metrics', 'challenge': challenge, 'run': run, 'seed': seed, 'value': metrics._asdict()}
+    return obj
+
 
 # TODO: Create a clean interface object (ex: DTO)
 def create_data_query(run: int, challenge: str, data_params: dict):
@@ -233,11 +285,18 @@ def run_experiment():
         logger.status('Received data from server')
 
         model = x.to(device)
-        log_params(model, logger)
+        # TODO: Turn back on if necessary
+        # log_params(model, logger)
         optimizer = optim.SGD(model.parameters(), lr=args['lr'], momentum=args['momentum'])
         for epoch in range(1, args['epochs'] + 1):
             train(args, model, device, train_data, optimizer, epoch, logger=logger)
-            test(args, model, device, test_data, logger=logger)
+            np_pred, np_target = test(args, model, device, test_data, logger=logger)
+
+        # TODO (opt): Put an option if we want per epoch or per run stats
+        metrics = metrics_dto(predictions=np_pred, target=np_target)
+        logger.metrics(metrics_dto_str(metrics))
+        logger.status('Sending metrics to server')
+        send_metrics_for_run(socket, EXPERIMENT_NAME, args['seed'], run, metrics)
 
         if (args['save_model']):
             torch.save(model.state_dict(), "mnist_cnn_{}.pt".format(args['type']))
