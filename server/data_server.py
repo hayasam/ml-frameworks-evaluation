@@ -8,6 +8,9 @@ import weakref
 import logging
 from pathlib import Path
 from torchvision import datasets, transforms
+from seed_controller import SeedController
+import traceback
+
 
 class Challenge(abc.ABC):
     def __init__(self, **kwargs):
@@ -41,6 +44,7 @@ class MNISTChallenge(Challenge):
 
 challenges = dict()
 challenges['mnist'] = MNISTChallenge()
+SEED_CONTROLLER = SeedController.from_saved_file('.seed_control.pickle')
 
 class MetricsLoggerStore(object):
     active_loggers = dict()
@@ -103,31 +107,40 @@ def send_array(socket, A, flags=0, copy=True, track=False):
     socket.send_json(md, flags|zmq.SNDMORE)
     return socket.send(A, flags, copy=copy, track=track)
 
-def set_experiment_seed(experiment_name, seed, **kwargs):
-    previous_seed = SEED_INFO.get(experiment_name)
-    if previous_seed != seed:
-        print('Setting a new seed (previously {}) now {}'.format(previous_seed, seed))
-    torch.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    if 'numpy' in globals():
-        np.random.seed(seed)
-    elif 'np' in globals():
-        np.random.seed(seed)
-    SEED_INFO[experiment_name] = seed
-    return True
+# def set_experiment_seed(experiment_name, seed, **kwargs):
+#     previous_seed = SEED_INFO.get(experiment_name)
+#     if previous_seed != seed:
+#         print('Setting a new seed (previously {}) now {}'.format(previous_seed, seed))
+#     torch.manual_seed(seed)
+#     torch.backends.cudnn.deterministic = True
+#     torch.backends.cudnn.benchmark = False
+#     if 'numpy' in globals():
+#         np.random.seed(seed)
+#     elif 'np' in globals():
+#         np.random.seed(seed)
+#     SEED_INFO[experiment_name] = seed
+#     return True
+
+
+def find_experiment_seed(**kwargs):
+    experiment_name = kwargs['experiment_name']
+    seed_info = SEED_CONTROLLER.get_seeds(experiment_name)
+    print('Seed for {} has value {}'.format(experiment_name, seed_info))
+    return seed_info
+
 
 def receive_metrics(**kwargs):
-    identifier = '{}_{}'.format(kwargs['challenge'], kwargs['seed'])
-    print('Received metrics from {}-{}-{}'.format(kwargs['challenge'], kwargs['run'], kwargs['seed']))
+    # TODO: Do something with kwargs['run']?
+    identifier = '{}_{}'.format(kwargs['experiment_name'], kwargs['challenge'])
+    print('Received metrics from {}'.format(identifier))
     m = kwargs['value']
-    metrics_msg = 'accuracy: {} - precision: {} - recall: {} - f1: {}'.format(m['accuracy'], m['precision'], m['recall'], m['f1_score'])
+    metrics_msg = 'run: {} - accuracy: {} - precision: {} - recall: {} - f1: {}'.format(kwargs['run'], m['accuracy'], m['precision'], m['recall'], m['f1_score'])
     print(metrics_msg)
     specific_logger = LOGGER_STORE.get_logger(experiment_name=identifier)
     specific_logger.debug(metrics_msg)
     return True
 
-def pair_stats_between_experiments(experiment_name_1, experiment_name_2):
+def pair_stats_between_experiments(experseediment_name_1, experiment_name_2):
     # TODO: Use Wilcoxon / Mann Whitney
     import scipy.stats
     # metrics = {'accuracy', 'precision', 'recall', 'f1_score'}
@@ -154,7 +167,7 @@ def start_server():
     server.bind(endpoint)
     handlers = {}
     resp_methods = {}
-    handlers['seed'] = set_experiment_seed
+    handlers['seed'] = find_experiment_seed
     handlers['data'] = prepare_data_for_run
     handlers['metrics'] = receive_metrics
     resp_methods['seed'] = server.send_pyobj
@@ -170,6 +183,7 @@ def start_server():
         try:
             resp = handlers[request['type']](**request)
         except Exception as e:
+            traceback.print_exc()
             print('Error:', e)
             server.send_pyobj(e)
         else:

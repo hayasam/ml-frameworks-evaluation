@@ -45,7 +45,7 @@ def log_params(model, logger):
     logger.parameters(model.fc1.weight)
     logger.parameters(model.fc2.weight)
 
-def set_seed(seed_info, **kwargs):
+def set_local_seed(seed_info, **kwargs):
     torch.manual_seed(seed_info)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
@@ -173,7 +173,7 @@ def metrics_dto(predictions, target) -> MetricsDTO:
     return MetricsDTO(accuracy=acc, precision=pr, recall=rec, f1_score=f1)
 
 def send_metrics_for_run(socket, experiment_name: str, seed: int, run: int, metrics_dto: MetricsDTO):
-    metrics_obj = create_calculated_metrics_message(run, challenge='mnist', seed=seed, metrics=metrics_dto)
+    metrics_obj = create_calculated_metrics_message(experiment_name=experiment_name, run=run, challenge='mnist', seed=seed, metrics=metrics_dto)
     socket.send_pyobj(metrics_obj)
     # Receive response
     obj = socket.recv_pyobj()
@@ -182,23 +182,33 @@ def send_metrics_for_run(socket, experiment_name: str, seed: int, run: int, metr
         raise Exception('Metrics were not synced')
 
 
-def create_calculated_metrics_message(run: int, challenge: str, seed: int, metrics: MetricsDTO):
+def create_calculated_metrics_message(experiment_name: str, run: int, challenge: str, seed: int, metrics: MetricsDTO):
     # TODO: Just send the DTO (implies making a middle package)
-    obj = {'type': 'metrics', 'challenge': challenge, 'run': run, 'seed': seed, 'value': metrics._asdict()}
+    obj = {'type': 'metrics', 'experiment_name': experiment_name, 'challenge': challenge, 'run': run, 'seed': seed, 'value': metrics._asdict()}
     return obj
 
 
 # TODO: Create a clean interface object (ex: DTO)
-def create_data_query(run: int, challenge: str, data_params: dict):
-    obj = {'type': 'data', 'challenge': challenge, 'run': run, **data_params}
+def create_data_query(run: int, challenge: str, seed: int, data_params: dict):
+    obj = {'type': 'data', 'challenge': challenge, 'run': run, 'seed': seed, **data_params}
     return obj
 
-def prepare_data_for_run(socket, run: int, data_params: dict):
-    socket.send_pyobj(create_data_query(challenge='mnist', run=run, data_params=data_params))
+def prepare_data_for_run(socket, run: int, seed: int,  data_params: dict):
+    socket.send_pyobj(create_data_query(challenge='mnist', run=run, seed=seed, data_params=data_params))
     msg = socket.recv_pyobj()
+    print('=======')
+    print(msg)
+    print('=======')
     train_data, test_data = msg
     print(train_data[0].shape, train_data[1].shape)
     return train_data, test_data
+
+
+def request_seed(socket, experiment_name):
+    req = {'type': 'seed', 'experiment_name': experiment_name}
+    socket.send_pyobj(req)
+    seed_info = socket.recv_pyobj()
+    return seed_info
 
 
 def set_server_seed(socket, EXPERIMENT_NAME, seed):
@@ -229,8 +239,6 @@ def parse_args():
                         help='SGD momentum (default: 0.5)')
     parser.add_argument('--use-cuda', action='store_true', default=False,
                         help='Forces CUDA training')
-    parser.add_argument('--seed', type=int, default=1, metavar='S',
-                        help='random seed (default: 1)')
     parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                         help='how many batches to wait before logging training status')
     parser.add_argument('--type', type=str, choices=['buggy', 'corrected', 'automl'],
@@ -268,20 +276,21 @@ def run_experiment():
     endpoint = "tcp://localhost:{}".format(port)
     socket, context = connect_server('tcp://localhost:90002')
 
-    # Advise server that this expirement will use this seed
-    set_server_seed(socket, EXPERIMENT_NAME, args['seed'])
-
-    set_seed(args['seed'])
-    x = Net()
-    x.apply(initialize_layer_weights)
-    device = torch.device("cuda" if args['use_cuda'] else "cpu")
-    kwargs = {'num_workers': 1, 'pin_memory': True} if args['use_cuda'] else {}
+    # Request server for seed
+    seed = request_seed(socket, EXPERIMENT_NAME)
+    logger.status('Using seed value {}'.format(seed))
 
     for run in range(args['runs']):
+        # Local seed is indexed at the run
+        set_local_seed(seed[run])
+        x = Net()
+        x.apply(initialize_layer_weights)
+        device = torch.device("cuda" if args['use_cuda'] else "cpu")
+        kwargs = {'num_workers': 1, 'pin_memory': True} if args['use_cuda'] else {}
         logger.current_run = run
         
         logger.status('Requesting data from server')
-        train_data, test_data = prepare_data_for_run(socket, run, data_params)
+        train_data, test_data = prepare_data_for_run(socket, run, seed[run], data_params)
         logger.status('Received data from server')
 
         model = x.to(device)
@@ -296,7 +305,7 @@ def run_experiment():
         metrics = metrics_dto(predictions=np_pred, target=np_target)
         logger.metrics(metrics_dto_str(metrics))
         logger.status('Sending metrics to server')
-        send_metrics_for_run(socket, EXPERIMENT_NAME, args['seed'], run, metrics)
+        send_metrics_for_run(socket, EXPERIMENT_NAME, seed, run, metrics)
 
         if (args['save_model']):
             torch.save(model.state_dict(), "mnist_cnn_{}.pt".format(args['type']))
