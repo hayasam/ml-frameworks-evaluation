@@ -1,76 +1,17 @@
 import sys
-import abc
 import zmq
 import numpy as np
 import torch
 import functools
-import weakref
 import logging
 from pathlib import Path
-from torchvision import datasets, transforms
 from seed_controller import SeedController
 import traceback
+from challenges import challenges as CHALLENGES
+from metrics_logger_store import MetricsLoggerStore
 
-
-class Challenge(abc.ABC):
-    def __init__(self, **kwargs):
-        pass
-    
-    @staticmethod
-    def get_subset(run: int, seed: int, train_batch_size: int, test_batch_size: int):
-        pass
-
-class MNISTChallenge(Challenge):
-    @staticmethod
-    def get_subset(run: int, seed: int, train_batch_size: int, test_batch_size: int):
-        # TODO: Something with params
-        train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('./data', train=True, download=True,
-                        transform=transforms.Compose([
-                            transforms.ToTensor(),
-                            transforms.Normalize((0.1307,), (0.3081,)),
-                            # transforms.Lambda(lambda v: v.numpy())
-                        ])),
-        batch_size=train_batch_size, shuffle=False, drop_last=True)    
-        test_loader = torch.utils.data.DataLoader(
-            datasets.MNIST('./data', train=False, transform=transforms.Compose([
-                            transforms.ToTensor(),
-                            transforms.Normalize((0.1307,), (0.3081,)),
-                            # transforms.Lambda(lambda v: v.numpy())
-                        ])),
-            batch_size=test_batch_size, shuffle=False, drop_last=True)
-        return train_loader, test_loader
-
-
-challenges = dict()
-challenges['mnist'] = MNISTChallenge()
 SEED_CONTROLLER = SeedController.from_saved_file('.seed_control.pickle')
-
-class MetricsLoggerStore(object):
-    active_loggers = dict()
-    def __init__(self, **kwargs):
-        self.base_path = Path(kwargs.get('base_path', '.'))
-        self.base_logger = logging.getLogger()
-
-    def get_logger(self, experiment_name: str, **kwargs):
-        if experiment_name in MetricsLoggerStore.active_loggers:
-            return MetricsLoggerStore.active_loggers[experiment_name]
-        print('Logger not found, creating')
-        experiment_logger = self.base_logger.getChild(experiment_name)
-        logger_options = {
-            'handler': logging.FileHandler(filename=str(self.base_path / '{}_metrics.log'.format(experiment_name)), mode='a'),
-            'formatter': logging.Formatter('%(message)s'),
-            'level': logging.DEBUG
-        }
-        experiment_logger.addHandler(logger_options['handler'])
-        logger_options['handler'].setFormatter(logger_options['formatter'])
-        experiment_logger.setLevel(logger_options['level'])
-
-        MetricsLoggerStore.active_loggers[experiment_name] = experiment_logger
-        return experiment_logger
-
 LOGGER_STORE = MetricsLoggerStore(base_path='.logs')
-
 
 def dataset_to_numpy(data_loader: torch.utils.data.DataLoader):
     data_x, data_y = [], []
@@ -88,7 +29,7 @@ def _dataset_size(train_set, test_set):
 
 @functools.lru_cache()
 def prepare_data_for_run(challenge: str, run: int, seed: int, train_batch_size: int, test_batch_size: int, **kwargs):
-    challenge = challenges[challenge]
+    challenge = CHALLENGES[challenge]
     train_loader, test_loader = challenge.get_subset(run=run, seed=seed,
                                                      train_batch_size=train_batch_size,
                                                      test_batch_size=test_batch_size)
@@ -106,20 +47,6 @@ def send_array(socket, A, flags=0, copy=True, track=False):
     )
     socket.send_json(md, flags|zmq.SNDMORE)
     return socket.send(A, flags, copy=copy, track=track)
-
-# def set_experiment_seed(experiment_name, seed, **kwargs):
-#     previous_seed = SEED_INFO.get(experiment_name)
-#     if previous_seed != seed:
-#         print('Setting a new seed (previously {}) now {}'.format(previous_seed, seed))
-#     torch.manual_seed(seed)
-#     torch.backends.cudnn.deterministic = True
-#     torch.backends.cudnn.benchmark = False
-#     if 'numpy' in globals():
-#         np.random.seed(seed)
-#     elif 'np' in globals():
-#         np.random.seed(seed)
-#     SEED_INFO[experiment_name] = seed
-#     return True
 
 
 def find_experiment_seed(**kwargs):
@@ -157,7 +84,6 @@ def pair_stats_between_experiments(experseediment_name_1, experiment_name_2):
         print('Wilcoxon p-value of ', p_w)
         print('Mann-Whitney p-value of ', p_mn)
 
-SEED_INFO = {}
 
 def start_server():
     # TODO: Server arg params
