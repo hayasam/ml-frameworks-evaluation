@@ -16,6 +16,9 @@ DEFAULT_SEED_FILE = '.seed_control.pickle'
 
 SEED_CONTROLLER = SeedController.from_saved_file(DEFAULT_SEED_FILE)
 LOGGER_STORE = MetricsLoggerStore(base_path='.logs')
+SERVER_LOGGER = logging.getLogger('server')
+SERVER_LOGGER.addHandler(logging.FileHandler('server.log'))
+SERVER_LOGGER.setLevel(logging.DEBUG)
 
 def dataset_to_numpy(data_loader: torch.utils.data.DataLoader):
     data_x, data_y = [], []
@@ -31,6 +34,19 @@ def _dataset_size(train_set, test_set):
     return 'Train: {} - {} . Test {} - {}'.format(train_set[0].shape, train_set[1].shape,
     test_set[0].shape, test_set[1].shape)
 
+def shuffle_dataset(x, y, seed):
+    if len(x) != len(y):
+        raise ValueError('x and y should have the same length!')
+    # Create a pseudo rng generator for current seed
+    rng = np.random.RandomState(seed)
+    shuffled_ix = rng.permutation(len(x))
+    return x[shuffled_ix], y[shuffled_ix]
+
+def _dataset_hash(train_set, test_set):
+    h_msg = 'Train x: {} - Train y: {} - Test x: {} - Test y: {}'.format(*[hash(bytes(x)) for x in [*train_set, *test_set]])
+    return h_msg
+
+# TODO: Challenges (or another class) should provide a method accepting a seed and deterministically return the train/test sets instead of defining it here
 @functools.lru_cache()
 def prepare_data_for_run(challenge: str, run: int, seed: int, train_batch_size: int, test_batch_size: int, **kwargs):
     challenge = CHALLENGES[challenge]
@@ -39,8 +55,12 @@ def prepare_data_for_run(challenge: str, run: int, seed: int, train_batch_size: 
                                                      test_batch_size=test_batch_size)
     np_train = dataset_to_numpy(train_loader)
     np_test = dataset_to_numpy(test_loader)
-    print('Sending', _dataset_size(np_train, np_test))
-    return np_train, np_test
+    shuffled_train = shuffle_dataset(np_train[0], np_train[1], seed)
+    shuffled_test = shuffle_dataset(np_test[0], np_test[1], seed)
+    print('Sending', _dataset_size(shuffled_train, shuffled_test))
+    h_msg = _dataset_hash(shuffled_train, shuffled_test)
+    SERVER_LOGGER.info('Challenge: {} - Run: {} - Seed: {} - Hashes: {}'.format(challenge, run, seed, h_msg))
+    return shuffled_train, shuffled_test
 
 # From ZeroMQ's doc
 def send_array(socket, A, flags=0, copy=True, track=False):
@@ -53,11 +73,11 @@ def send_array(socket, A, flags=0, copy=True, track=False):
     return socket.send(A, flags, copy=copy, track=track)
 
 
-def find_experiment_seed(**kwargs):
+def find_experiment_random_states(**kwargs):
     experiment_name = kwargs['experiment_name']
-    seed_info = SEED_CONTROLLER.get_seeds(experiment_name)
-    print('Seed for {} has value {}'.format(experiment_name, seed_info))
-    return seed_info
+    random_state = SEED_CONTROLLER.get_random_states(experiment_name)
+    print('Random states for {} are {}'.format(experiment_name, random_state))
+    return random_state
 
 
 def receive_metrics(**kwargs):
@@ -99,7 +119,7 @@ def save_current_info(signal, frame):
 def setup_server_handlers(server):
     request_handlers = {}
     response_handlers = {}
-    request_handlers['seed'] = find_experiment_seed
+    request_handlers['seed'] = find_experiment_random_states
     request_handlers['data'] = prepare_data_for_run
     request_handlers['metrics'] = receive_metrics
     response_handlers['seed'] = server.send_pyobj
