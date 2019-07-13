@@ -1,6 +1,10 @@
+joblib==0.13.2
 numpy==1.16.4
 Pillow-SIMD==6.0.0.post0
 pyzmq==18.0.2
+scikit-learn==0.21.2
+scipy==1.3.0
 six==1.12.0
+sklearn==0.0
 torch==1.1.0
 torchvision==0.3.0
