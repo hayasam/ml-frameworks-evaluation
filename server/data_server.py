@@ -1,16 +1,19 @@
-import sys
-import zmq
-import numpy as np
-import torch
 import functools
 import logging
-from pathlib import Path
-from seed_controller import SeedController
+import sys
 import traceback
+from pathlib import Path
+
+import numpy as np
+import torch
+import zmq
 from challenges import challenges as CHALLENGES
 from metrics_logger_store import MetricsLoggerStore
+from seed_controller import SeedController
 
-SEED_CONTROLLER = SeedController.from_saved_file('.seed_control.pickle')
+DEFAULT_SEED_FILE = '.seed_control.pickle'
+
+SEED_CONTROLLER = SeedController.from_saved_file(DEFAULT_SEED_FILE)
 LOGGER_STORE = MetricsLoggerStore(base_path='.logs')
 
 def dataset_to_numpy(data_loader: torch.utils.data.DataLoader):
@@ -67,7 +70,7 @@ def receive_metrics(**kwargs):
     specific_logger.debug(metrics_msg)
     return True
 
-def pair_stats_between_experiments(experseediment_name_1, experiment_name_2):
+def pair_stats_between_experiments(experiment_name_1, experiment_name_2):
     # TODO: Use Wilcoxon / Mann Whitney
     import scipy.stats
     # metrics = {'accuracy', 'precision', 'recall', 'f1_score'}
@@ -84,6 +87,16 @@ def pair_stats_between_experiments(experseediment_name_1, experiment_name_2):
         print('Wilcoxon p-value of ', p_w)
         print('Mann-Whitney p-value of ', p_mn)
 
+def setup_server_handlers(server):
+    request_handlers = {}
+    response_handlers = {}
+    request_handlers['seed'] = find_experiment_seed
+    request_handlers['data'] = prepare_data_for_run
+    request_handlers['metrics'] = receive_metrics
+    response_handlers['seed'] = server.send_pyobj
+    response_handlers['data'] = server.send_pyobj
+    response_handlers['metrics'] = server.send_pyobj
+    return request_handlers, response_handlers
 
 def start_server():
     # TODO: Server arg params
@@ -91,14 +104,9 @@ def start_server():
     context = zmq.Context()
     server = context.socket(zmq.PAIR)
     server.bind(endpoint)
-    handlers = {}
-    resp_methods = {}
-    handlers['seed'] = find_experiment_seed
-    handlers['data'] = prepare_data_for_run
-    handlers['metrics'] = receive_metrics
-    resp_methods['seed'] = server.send_pyobj
-    resp_methods['data'] = server.send_pyobj
-    resp_methods['metrics'] = server.send_pyobj
+    
+    handlers, resp_methods = setup_server_handlers(server)
+
     print("I: Service is ready at %s" % endpoint)
     while True:
         request = server.recv_pyobj()
