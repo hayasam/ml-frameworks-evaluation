@@ -6,6 +6,7 @@ class MetricsLoggerStore(object):
     active_loggers = dict()
     def __init__(self, **kwargs):
         self.base_path = Path(kwargs.get('base_path', '.'))
+        self.base_path.mkdir(parents=True, exist_ok=True)
         self.base_logger = logging.getLogger()
 
     def get_logger(self, experiment_name: str, **kwargs):
