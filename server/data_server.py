@@ -3,8 +3,8 @@ import logging
 import signal
 import sys
 import traceback
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -12,8 +12,8 @@ import zmq
 from challenges import challenges as CHALLENGES
 from metrics_logger_store import MetricsLoggerStore
 from seed_controller import SeedController
-from settings import METRICS_LOG_BASE_PATH, SEED_CONTROLLER_FILE, SERVER_LOG_FILE
-
+from settings import (METRICS_LOG_BASE_PATH, SEED_CONTROLLER_FILE,
+                      SERVER_ENDPOINT_CONNEXION, SERVER_LOG_FILE)
 
 SEED_CONTROLLER = SeedController.from_saved_file(SEED_CONTROLLER_FILE)
 LOGGER_STORE = MetricsLoggerStore(base_path=METRICS_LOG_BASE_PATH)
@@ -153,8 +153,7 @@ def setup_server_handlers(server):
     return request_handlers, response_handlers
 
 def start_server():
-    # TODO: Server arg params
-    endpoint = "tcp://*:90002"
+    endpoint = SERVER_ENDPOINT_CONNEXION
     context = zmq.Context()
     server = context.socket(zmq.PAIR)
     server.bind(endpoint)
