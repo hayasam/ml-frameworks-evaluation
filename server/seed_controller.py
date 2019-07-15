@@ -1,10 +1,10 @@
 import pickle
-import numpy as np
 from pathlib import Path
 
-DEFAULT_MINIMAL_SEED_LEN = 1_000
-DEFAULT_MIN_SEED_VALUE = 0
-DEFAULT_MAX_SEED_VALUE = 65536
+import numpy as np
+from settings import (DEFAULT_MAX_SEED_VALUE, DEFAULT_MIN_SEED_VALUE,
+                      DEFAULT_MINIMAL_SEED_LEN)
+
 
 def init(value_min, value_max, value_count):
     return np.random.randint(value_min, value_max, value_count)
@@ -17,7 +17,6 @@ class SeedController(object):
         self.max_seed_value = kwargs.get('max_val', DEFAULT_MAX_SEED_VALUE)
         if self.seed_len < DEFAULT_MINIMAL_SEED_LEN:
             raise ValueError('Seed length (seed_len) needs to be greater than 1,000')
-        min_seed_val, max_seed_val = np.iinfo(np.int).min, np.iinfo(np.int).max
         self._mapping = dict()
 
     @classmethod

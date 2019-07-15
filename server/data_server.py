@@ -4,6 +4,7 @@ import signal
 import sys
 import traceback
 from pathlib import Path
+from datetime import datetime
 
 import numpy as np
 import torch
@@ -11,13 +12,13 @@ import zmq
 from challenges import challenges as CHALLENGES
 from metrics_logger_store import MetricsLoggerStore
 from seed_controller import SeedController
+from settings import METRICS_LOG_BASE_PATH, SEED_CONTROLLER_FILE, SERVER_LOG_FILE
 
-DEFAULT_SEED_FILE = '.seed_control.pickle'
 
-SEED_CONTROLLER = SeedController.from_saved_file(DEFAULT_SEED_FILE)
-LOGGER_STORE = MetricsLoggerStore(base_path='.logs')
+SEED_CONTROLLER = SeedController.from_saved_file(SEED_CONTROLLER_FILE)
+LOGGER_STORE = MetricsLoggerStore(base_path=METRICS_LOG_BASE_PATH)
 SERVER_LOGGER = logging.getLogger('server')
-SERVER_LOGGER.addHandler(logging.FileHandler('server.log'))
+SERVER_LOGGER.addHandler(logging.FileHandler(SERVER_LOG_FILE))
 SERVER_LOGGER.setLevel(logging.DEBUG)
 
 def dataset_to_numpy(data_loader: torch.utils.data.DataLoader):
@@ -40,6 +41,7 @@ def shuffle_dataset(x, y, seed):
     # Create a pseudo rng generator for current seed
     rng = np.random.RandomState(seed)
     shuffled_ix = rng.permutation(len(x))
+    SERVER_LOGGER.debug('Seed {} | First 10 shuffled indices: {}'.format(seed, shuffled_ix[:10]))
     return x[shuffled_ix], y[shuffled_ix]
 
 def _dataset_hash(train_set, test_set):
@@ -96,14 +98,27 @@ def receive_metrics(**kwargs):
     specific_logger.debug(metrics_msg)
     return True
 
-def pair_stats_between_experiments(experiment_name_1, experiment_name_2):
-    # TODO: Use Wilcoxon / Mann Whitney
+DEFAULT_POPULATION_SIZE = 1_000
+def pair_stats_between_experiments(experiment_name_1, experiment_name_2, n_samples=DEFAULT_POPULATION_SIZE):
     import scipy.stats
-    # metrics = {'accuracy', 'precision', 'recall', 'f1_score'}
+    # metrics = {'accuracy', 'precision', 'recall', 'f1'}
+    # TODO: Change for logger store to save a numpy array and just load that instead of reading a log file
     def aggregate_metric(experiment_name, metric):
-        pass
+        aggregate_metric.positions = {'run': 0, 'accuracy': 1, 'precision': 2, 'recall': 3, 'f1': 4}
+        specific_logger = LOGGER_STORE.get_logger(experiment_name)
+        log_file = next(h for h in specific_logger.handlers if isinstance(h, logging.FileHandler)).baseFilename
+        arr = np.zeros((n_samples, ))
+        with open(log_file, 'r') as lf:
+            line = lf.readline()
+            while line != '':
+                splits = [metric_kv.split(': ') for metric_kv in line.split('-')]
+                run = int(splits[aggregate_metric.positions['run']][1])
+                metric_value = splits[aggregate_metric.positions[metric]][1]
+                arr[run] = float(metric_value)
+                line = lf.readline()
+        return arr
 
-    metrics = {'f1_score'}
+    metrics = {'f1'}
     for metric in metrics:
         m_1 = aggregate_metric(experiment_name_1, metric)
         m_2 = aggregate_metric(experiment_name_2, metric)
@@ -115,10 +130,15 @@ def pair_stats_between_experiments(experiment_name_1, experiment_name_2):
 
 def save_current_info(signal, frame):
     print('Captured exit signal')
-    if 'SEED_CONTROLLER' in globals():
-        print('Saving SEED_CONTROLLER to {}'.format(DEFAULT_SEED_FILE))
-        SEED_CONTROLLER.dump(DEFAULT_SEED_FILE, overwrite=True)
-    exit(0)
+    try:
+        if 'SEED_CONTROLLER' in globals():
+            print('Saving SEED_CONTROLLER to {}'.format(SEED_CONTROLLER_FILE))
+            SEED_CONTROLLER.dump(SEED_CONTROLLER_FILE, overwrite=True)
+        SERVER_LOGGER.info('Server down and saved at {}'.format(str(datetime.now())))
+    except Exception as e:
+        print('ERROR in exit signal handler', e)
+    finally:
+        exit(0)
 
 
 def setup_server_handlers(server):
@@ -144,6 +164,7 @@ def start_server():
     print("I: Service is ready at %s" % endpoint)
     # Setup interrupt handler
     signal.signal(signal.SIGINT, save_current_info)
+    SERVER_LOGGER.info('Server up at {}'.format(str(datetime.now())))
 
     while True:
         request = server.recv_pyobj()
