@@ -1,3 +1,4 @@
+import os
 import argparse
 import logging
 from collections import namedtuple
@@ -33,6 +34,9 @@ class Net(nn.Module):
         x = self.fc2(x)
         return F.log_softmax(x, dim=1)
 
+# TODO: Create env file?
+DEFAULT_ENDPOINT = 'tcp://localhost:9002'
+DATA_SERVER_ENDPOINT = os.getenv('DATA_SERVER_ENDPOINT', DEFAULT_ENDPOINT)
 
 def log_params(model, logger):
     # TODO
@@ -161,9 +165,7 @@ def run_experiment():
     logger = ExperimentLogger(EXPERIMENT_NAME, **args)
 
     # Get server connection
-    port = 90002
-    endpoint = "tcp://localhost:{}".format(port)
-    socket, context = connect_server('tcp://localhost:90002')
+    socket, context = connect_server(DATA_SERVER_ENDPOINT)
 
     # Request server for seed
     seed = server_interactions.request_seed(socket, EXPERIMENT_NAME)
@@ -211,8 +213,9 @@ def recv_array(socket, flags=0, copy=True, track=False):
     return A.reshape(md['shape'])
 
 
-def connect_server(endpoint):
+def connect_server(endpoint=DEFAULT_ENDPOINT):
     # TODO: Connect args
+    print('Connecting to {}'.format(endpoint))
     context = zmq.Context()
     socket = context.socket(zmq.PAIR)
     socket.connect(endpoint)
