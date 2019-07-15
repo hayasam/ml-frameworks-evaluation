@@ -135,6 +135,7 @@ def parse_args():
                         help='how many batches to wait before logging training status')
     parser.add_argument('--type', type=str, choices=['buggy', 'corrected', 'automl'],
                         required=True)
+    parser.add_argument('--resume-run-at', type=int, help='what run to resume training from')
     parser.add_argument('--name', required=True, type=str)
     parser.add_argument('--runs', required=True, type=int)
     parser.add_argument('--log-dir', required=True, type=str)
@@ -171,7 +172,7 @@ def run_experiment():
     seed = server_interactions.request_seed(socket, EXPERIMENT_NAME)
     logger.status('Using seed value {}'.format(seed))
 
-    for run in range(args['runs']):
+    for run in range(args.get('resume_run_at', 0), args['runs']):
         # Local seed is indexed at the run
         set_local_seed(seed[run])
         # Recreate the net for each run with new initial weights
