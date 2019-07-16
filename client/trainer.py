@@ -172,7 +172,7 @@ def run_experiment():
     seed = server_interactions.request_seed(socket, EXPERIMENT_NAME)
     logger.status('Using seed value {}'.format(seed))
 
-    for run in range(args.get('resume_run_at', 0), args['runs']):
+    for run in range(args['resume_run_at'] or 0, args['runs']):
         # Local seed is indexed at the run
         set_local_seed(seed[run])
         # Recreate the net for each run with new initial weights
