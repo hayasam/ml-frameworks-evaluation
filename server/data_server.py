@@ -118,15 +118,18 @@ def pair_stats_between_experiments(experiment_name_1, experiment_name_2, n_sampl
                 line = lf.readline()
         return arr
 
-    metrics = {'f1'}
+    metrics = ['f1', 'accuracy', 'precision', 'recall']
     for metric in metrics:
+        print('-- Metric {} --'.format(metric))
         m_1 = aggregate_metric(experiment_name_1, metric)
         m_2 = aggregate_metric(experiment_name_2, metric)
         # Our metrics are continuous, so correction for continuity?
         w, p_w = scipy.stats.wilcoxon(m_1, m_2, correction=False)
-        mn, p_mn = scipy.stats.wilcoxon(m_1, m_2, correction=False)
+        mn, p_mn = scipy.stats.mannwhitneyu(m_1, m_2, use_continuity=False)
+        tv, p_t = scipy.stats.ttest_ind(m_1, m_2)
         print('Wilcoxon p-value of ', p_w)
         print('Mann-Whitney p-value of ', p_mn)
+        print('Student p-value of ', p_t)
 
 def save_current_info(signal, frame):
     print('Captured exit signal')
