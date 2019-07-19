@@ -7,9 +7,6 @@ import zmq
 
 import numpy as np
 import server_interactions
-import torch
-import torch.nn.functional as F
-import torch.optim as optim
 from experiment_logger import ExperimentLogger
 from metrics_dto import create_metrics_dto, metrics_dto_str
 from models.models_store import ModelStore
@@ -24,9 +21,13 @@ def log_params(model, logger):
     logger.parameters(model.get_params_str())
 
 def set_local_seed(seed_info, **kwargs):
-    torch.manual_seed(seed_info)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    try:
+        import torch
+        torch.manual_seed(seed_info)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    except ImportError:
+        pass
     if 'numpy' in globals():
         np.random.seed(seed_info)
     if 'np' in globals():
@@ -39,50 +40,11 @@ class ChallengeRunIdentifier(dict):
         _underlying = {k:v for k,v in kwargs.items() if k in ChallengeRunIdentifier.props}
         return cls(_underlying)
 
-# TODO: Refactor train and test logic outside of this file
-def train(args, model, device, train_loader, optimizer, epoch, logger):
-    model.train()
-    train_x, train_y = train_loader
-    # print(train_x.shape, train_y.shape)
-    for batch_idx, (np_data, np_target) in enumerate(zip(train_x, train_y)):
-        data, target = torch.from_numpy(np_data), torch.from_numpy(np_target)
-        data, target = data.to(device), target.to(device)
-        optimizer.zero_grad()
-        output = model(data)
-        loss = F.nll_loss(output, target)
-        loss.backward()
-        optimizer.step()
-        if batch_idx % args['log_interval'] == 0:
-            message = 'Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-            epoch, batch_idx * train_x.shape[1], train_y.size,
-            100. * batch_idx / train_x.shape[0], loss.item())
-            logger.train(message)
+def train(model, train_loader, epoch, logger, **kwargs):
+    model.train_on_data(train_data=train_loader, current_epoch=epoch, logger=logger, **kwargs)
 
-def test(args, model, device, test_loader, logger):
-    model.eval()
-    test_loss = 0
-    correct = 0
-    test_x, test_y = test_loader
-    preds = []
-    with torch.no_grad():
-        for np_data, np_target in zip(test_x, test_y):
-            data, target = torch.from_numpy(np_data), torch.from_numpy(np_target)
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            test_loss += F.nll_loss(output, target, reduction='sum').item() # sum up batch loss
-            pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
-            correct += pred.eq(target.view_as(pred)).sum().item()
-            preds.append(pred.cpu().numpy())
-    total_n_examples = test_y.size  # test_x.shape[0] * test_x.shape[1]
-    test_loss /= total_n_examples
-
-    message = '\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, total_n_examples,
-        100. * correct / total_n_examples)
-    logger.train(message)
-
-    np_pred = np.array(preds).ravel()
-    np_target = test_y.ravel()
+def test(model, test_loader, logger):
+    np_pred, np_target = model.test_on_data(test_loader, logger)
     # print('Output shape', np_target.shape, 'Pred shape', np_pred.shape)
     acc, pr, rec, f1 = accuracy_score(y_true=np_target, y_pred=np_pred), precision_score(y_true=np_target, y_pred=np_pred, average='macro'), recall_score(y_true=np_target, y_pred=np_pred, average='macro'), f1_score(y_true=np_target, y_pred=np_pred, average='macro')
     metrics_msg = 'accuracy: {} - precision: {} - recall: {} - f1: {}'.format(acc, pr, rec, f1)
@@ -93,16 +55,8 @@ def test(args, model, device, test_loader, logger):
 def parse_args():
     # Training settings
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
-    parser.add_argument('--train-batch-size', type=int, default=64, metavar='N',
-                        help='input batch size for training (default: 64)')
-    parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
-                        help='input batch size for testing (default: 1000)')
     parser.add_argument('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train (default: 10)')
-    parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
-                        help='learning rate (default: 0.01)')
-    parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
-                        help='SGD momentum (default: 0.5)')
     parser.add_argument('--use-cuda', action='store_true', default=False,
                         help='Forces CUDA training')
     parser.add_argument('--log-interval', type=int, default=10, metavar='N',
@@ -125,16 +79,11 @@ def parse_args():
 def run_experiment():
     args = parse_args()
     print(args)
-    data_params_keys = ['batch_size', 'train_batch_size', 'test_batch_size', 'seed']
-    model_params_keys = ['lr', 'momentum', 'use_cuda', 'type']
+
     runtime_params_keys = ['epochs', 'log_interval', 'log_dir', 'save_model', 'runs']
-    
-    data_params = {k:v for k,v in args.items() if k in data_params_keys}
-    model_params = {k:v for k,v in args.items() if k in model_params_keys}
     runtime_params = {k:v for k,v in args.items() if k in runtime_params_keys}
-    print('Data params', data_params)
-    print('model params', model_params)
     print('Runtime params', runtime_params)
+
     if args['use_cuda'] and not torch.cuda.is_available():
         # TODO put logger
         raise ValueError("CUDA was requested but CUDA is not available")
@@ -153,24 +102,24 @@ def run_experiment():
         current_seed = seed[run]
         # Local seed is indexed at the run
         set_local_seed(current_seed)
+        model_creation_args = {'use_gpu': args['use_cuda']}
         # Recreate the net for each run with new initial weights
-        x = ModelStore.get_model_for_name(library=args['model_library'], name=args['model_name'])
-        x.initialize_weights(current_seed)
+        model = ModelStore.get_model_for_name(library=args['model_library'], name=args['model_name'], **model_creation_args)
+        model.initialize_weights(current_seed)
 
-        device = torch.device("cuda" if args['use_cuda'] else "cpu")
         logger.current_run = run
-        
+        data_params = model.get_data_params()
         logger.status('Requesting data from server')
         train_data, test_data = server_interactions.prepare_data_for_run(socket, EXPERIMENT_NAME, run, current_seed, data_params)
         logger.status('Received data from server')
 
-        model = x.use_device(device)
         # TODO: Turn back on if necessary
         log_params(model, logger)
-        optimizer = optim.SGD(model.parameters(), lr=args['lr'], momentum=args['momentum'])
+
+        model.start_training()
         for epoch in range(1, args['epochs'] + 1):
-            train(args, model, device, train_data, optimizer, epoch, logger=logger)
-            np_pred, np_target = test(args, model, device, test_data, logger=logger)
+            train(model, train_data, epoch, logger, **runtime_params)
+            np_pred, np_target = test(model, test_data, logger)
 
         # TODO (opt): Put an option if we want per epoch or per run stats
         metrics = create_metrics_dto(predictions=np_pred, target=np_target)
