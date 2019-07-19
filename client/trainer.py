@@ -1,49 +1,27 @@
-import os
 import argparse
 import logging
+import os
 from collections import namedtuple
+
+import zmq
 
 import numpy as np
 import server_interactions
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import zmq
 from experiment_logger import ExperimentLogger
 from metrics_dto import create_metrics_dto, metrics_dto_str
+from models.models_store import ModelStore
 from sklearn.metrics import (accuracy_score, f1_score, precision_score,
                              recall_score)
-
-
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(1, 20, 5, 1)
-        self.conv2 = nn.Conv2d(20, 50, 5, 1)
-        self.fc1 = nn.Linear(4*4*50, 500)
-        self.fc2 = nn.Linear(500, 10)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.max_pool2d(x, 2, 2)
-        x = F.relu(self.conv2(x))
-        x = F.max_pool2d(x, 2, 2)
-        x = x.view(-1, 4*4*50)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return F.log_softmax(x, dim=1)
 
 # TODO: Create env file?
 DEFAULT_ENDPOINT = 'tcp://localhost:90002'
 DATA_SERVER_ENDPOINT = os.getenv('DATA_SERVER_ENDPOINT', DEFAULT_ENDPOINT)
 
 def log_params(model, logger):
-    # TODO
-    logger.parameters(model.conv1.weight)
-    logger.parameters(model.conv2.weight)
-    logger.parameters(model.fc1.weight)
-    logger.parameters(model.fc2.weight)
+    logger.parameters(model.get_params_str())
 
 def set_local_seed(seed_info, **kwargs):
     torch.manual_seed(seed_info)
@@ -61,11 +39,7 @@ class ChallengeRunIdentifier(dict):
         _underlying = {k:v for k,v in kwargs.items() if k in ChallengeRunIdentifier.props}
         return cls(_underlying)
 
-
-def initialize_layer_weights(module):
-    if hasattr(module, 'weight') and isinstance(module.weight, torch.nn.parameter.Parameter):
-        torch.nn.init.xavier_uniform_(module.weight)
-
+# TODO: Refactor train and test logic outside of this file
 def train(args, model, device, train_loader, optimizer, epoch, logger):
     model.train()
     train_x, train_y = train_loader
@@ -137,6 +111,9 @@ def parse_args():
                         required=True)
     parser.add_argument('--resume-run-at', type=int, help='what run to resume training from')
     parser.add_argument('--name', required=True, type=str)
+    # TODO: Put them required in the future
+    parser.add_argument('--model-library',  default="pytorch", type=str)
+    parser.add_argument('--model-name',  default="Net", type=str)
     parser.add_argument('--runs', required=True, type=int)
     parser.add_argument('--log-dir', required=True, type=str)
     parser.add_argument('--save-model', action='store_true', default=False,
@@ -173,22 +150,23 @@ def run_experiment():
     logger.status('Using seed value {}'.format(seed))
 
     for run in range(args['resume_run_at'] or 0, args['runs']):
+        current_seed = seed[run]
         # Local seed is indexed at the run
-        set_local_seed(seed[run])
+        set_local_seed(current_seed)
         # Recreate the net for each run with new initial weights
-        x = Net()
-        x.apply(initialize_layer_weights)
+        x = ModelStore.get_model_for_name(library=args['model_library'], name=args['model_name'])
+        x.initialize_weights(current_seed)
+
         device = torch.device("cuda" if args['use_cuda'] else "cpu")
-        kwargs = {'num_workers': 1, 'pin_memory': True} if args['use_cuda'] else {}
         logger.current_run = run
         
         logger.status('Requesting data from server')
-        train_data, test_data = server_interactions.prepare_data_for_run(socket, EXPERIMENT_NAME, run, seed[run], data_params)
+        train_data, test_data = server_interactions.prepare_data_for_run(socket, EXPERIMENT_NAME, run, current_seed, data_params)
         logger.status('Received data from server')
 
-        model = x.to(device)
+        model = x.use_device(device)
         # TODO: Turn back on if necessary
-        # log_params(model, logger)
+        log_params(model, logger)
         optimizer = optim.SGD(model.parameters(), lr=args['lr'], momentum=args['momentum'])
         for epoch in range(1, args['epochs'] + 1):
             train(args, model, device, train_data, optimizer, epoch, logger=logger)
@@ -201,7 +179,7 @@ def run_experiment():
         server_interactions.send_metrics_for_run(socket, EXPERIMENT_NAME, seed, run, metrics)
 
         if (args['save_model']):
-            torch.save(model.state_dict(), "mnist_cnn_{}.pt".format(args['type']))
+            model.save(evaluation_type=args['type'], run=run)
         log_params(model, logger)
 
 
