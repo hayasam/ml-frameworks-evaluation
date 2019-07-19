@@ -35,7 +35,7 @@ class Net(nn.Module):
         return F.log_softmax(x, dim=1)
 
 # TODO: Create env file?
-DEFAULT_ENDPOINT = 'tcp://localhost:9002'
+DEFAULT_ENDPOINT = 'tcp://localhost:90002'
 DATA_SERVER_ENDPOINT = os.getenv('DATA_SERVER_ENDPOINT', DEFAULT_ENDPOINT)
 
 def log_params(model, logger):
