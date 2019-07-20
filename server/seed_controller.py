@@ -32,8 +32,8 @@ class SeedController(object):
         with open(file_destination , 'wb') as output_file:
             pickle.dump(self, output_file)
 
-    def get_random_states(self, experiment_name: str):
-        if experiment_name in self._mapping:
-            return self._mapping[experiment_name]
-        self._mapping[experiment_name] = init(self.min_seed_value, self.max_seed_value, self.seed_len)
-        return self._mapping[experiment_name]
+    def get_random_states(self, seed_identifier: str):
+        if seed_identifier in self._mapping:
+            return self._mapping[seed_identifier]
+        self._mapping[seed_identifier] = init(self.min_seed_value, self.max_seed_value, self.seed_len)
+        return self._mapping[seed_identifier]

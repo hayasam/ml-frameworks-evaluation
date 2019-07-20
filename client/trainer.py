@@ -3,10 +3,10 @@ import logging
 import os
 from collections import namedtuple
 
-import zmq
-
 import numpy as np
 import server_interactions
+import zmq
+from ml_evaluation_ipc_communication import EvaluationRunIdentifier
 from experiment_logger import ExperimentLogger
 from metrics_dto import create_metrics_dto, metrics_dto_str
 from models.models_store import ModelStore
@@ -32,13 +32,6 @@ def set_local_seed(seed_info, **kwargs):
         np.random.seed(seed_info)
     if 'np' in globals():
         np.random.seed(seed_info)
-
-class ChallengeRunIdentifier(dict):
-    props = ['challenge', 'run', 'seed']
-    @classmethod
-    def from_values(cls, **kwargs):
-        _underlying = {k:v for k,v in kwargs.items() if k in ChallengeRunIdentifier.props}
-        return cls(_underlying)
 
 def train(model, train_loader, epoch, logger, **kwargs):
     model.train_on_data(train_data=train_loader, current_epoch=epoch, logger=logger, **kwargs)
@@ -66,6 +59,7 @@ def parse_args():
     parser.add_argument('--resume-run-at', type=int, help='what run to resume training from')
     parser.add_argument('--name', required=True, type=str)
     # TODO: Put them required in the future
+    parser.add_argument('--challenge',  default="mnist", type=str)
     parser.add_argument('--model-library',  default="pytorch", type=str)
     parser.add_argument('--model-name',  default="Net", type=str)
     parser.add_argument('--runs', required=True, type=int)
@@ -89,13 +83,14 @@ def run_experiment():
         raise ValueError("CUDA was requested but CUDA is not available")
 
     EXPERIMENT_NAME = '{}_{}'.format(args['name'], args['type'])
+    run_identifier = EvaluationRunIdentifier(name=args['name'], evaluation_type=args['type'], challenge=args['challenge'],  lib_name=args['model_library'], model_name=args['model_name'])
     logger = ExperimentLogger(EXPERIMENT_NAME, **args)
 
     # Get server connection
     socket, context = connect_server(DATA_SERVER_ENDPOINT)
 
     # Request server for seed
-    seed = server_interactions.request_seed(socket, EXPERIMENT_NAME)
+    seed = server_interactions.request_seed(socket, run_identifier)
     logger.status('Using seed value {}'.format(seed))
 
     for run in range(args['resume_run_at'] or 0, args['runs']):
@@ -110,7 +105,7 @@ def run_experiment():
         logger.current_run = run
         data_params = model.get_data_params()
         logger.status('Requesting data from server')
-        train_data, test_data = server_interactions.prepare_data_for_run(socket, EXPERIMENT_NAME, run, current_seed, data_params)
+        train_data, test_data = server_interactions.prepare_data_for_run(socket, run_identifier, run, current_seed, data_params)
         logger.status('Received data from server')
 
         # TODO: Turn back on if necessary
@@ -125,7 +120,7 @@ def run_experiment():
         metrics = create_metrics_dto(predictions=np_pred, target=np_target)
         logger.metrics(metrics_dto_str(metrics))
         logger.status('Sending metrics to server')
-        server_interactions.send_metrics_for_run(socket, EXPERIMENT_NAME, seed, run, metrics)
+        server_interactions.send_metrics_for_run(socket, run_identifier, seed, run, metrics)
 
         if (args['save_model']):
             model.save(evaluation_type=args['type'], run=run)

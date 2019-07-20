@@ -14,6 +14,8 @@ from metrics_logger_store import MetricsLoggerStore
 from seed_controller import SeedController
 from settings import (METRICS_LOG_BASE_PATH, SEED_CONTROLLER_FILE,
                       SERVER_ENDPOINT_CONNEXION, SERVER_LOG_FILE)
+from stats import print_pair_metrics_from_files
+from ml_evaluation_ipc_communication import EvaluationRunIdentifier
 
 SEED_CONTROLLER = SeedController.from_saved_file(SEED_CONTROLLER_FILE)
 LOGGER_STORE = MetricsLoggerStore(base_path=METRICS_LOG_BASE_PATH)
@@ -48,15 +50,20 @@ def _dataset_hash(train_set, test_set):
     h_msg = 'Train x: {} - Train y: {} - Test x: {} - Test y: {}'.format(*[hash(bytes(x)) for x in [*train_set, *test_set]])
     return h_msg
 
-# TODO: lru_cache's key are the parameters which are currently changing depending on various factors, if a custom
-# object is created, not only would we reduce the number of parameters, we would benefit from a consistent hash value
 # TODO: Challenges (or another class) should provide a method accepting a seed and deterministically return the train/test sets instead of defining it here
-# @functools.lru_cache(max_size=3)
-def prepare_data_for_run(challenge: str, experiment_name: str, run: int, seed: int, train_batch_size: int, test_batch_size: int, **kwargs):
+def prepare_data_for_run(run_identifier: EvaluationRunIdentifier, run: int, seed: int, train_batch_size: int, test_batch_size: int, **kwargs):
     # Verify seeds are coordinated
-    assert seed == find_experiment_random_states(experiment_name=experiment_name)[run]
+    assert seed == find_experiment_random_states(run_identifier)[run]
+    shuffled_train, shuffled_test = get_data_for_challenge_seed(run_identifier.challenge, seed, run, train_batch_size, test_batch_size)
+   
+    print('Sending', _dataset_size(shuffled_train, shuffled_test))
+    h_msg = _dataset_hash(shuffled_train, shuffled_test)
+    SERVER_LOGGER.info('Challenge: {} - Run: {} - Seed: {} - Hashes: {}'.format(run_identifier.challenge, run, seed, h_msg))
+    return shuffled_train, shuffled_test
 
-    challenge = CHALLENGES[challenge]
+@functools.lru_cache(maxsize=3)
+def get_data_for_challenge_seed(challenge_name: str, seed: int, run: int, train_batch_size, test_batch_size):
+    challenge = CHALLENGES[challenge_name]
     train_loader, test_loader = challenge.get_subset(run=run, seed=seed,
                                                      train_batch_size=train_batch_size,
                                                      test_batch_size=test_batch_size)
@@ -64,9 +71,6 @@ def prepare_data_for_run(challenge: str, experiment_name: str, run: int, seed: i
     np_test = dataset_to_numpy(test_loader)
     shuffled_train = shuffle_dataset(np_train[0], np_train[1], seed)
     shuffled_test = shuffle_dataset(np_test[0], np_test[1], seed)
-    print('Sending', _dataset_size(shuffled_train, shuffled_test))
-    h_msg = _dataset_hash(shuffled_train, shuffled_test)
-    SERVER_LOGGER.info('Challenge: {} - Run: {} - Seed: {} - Hashes: {}'.format(challenge, run, seed, h_msg))
     return shuffled_train, shuffled_test
 
 # From ZeroMQ's doc
@@ -80,16 +84,17 @@ def send_array(socket, A, flags=0, copy=True, track=False):
     return socket.send(A, flags, copy=copy, track=track)
 
 
-def find_experiment_random_states(**kwargs):
-    experiment_name = kwargs['experiment_name']
-    random_state = SEED_CONTROLLER.get_random_states(experiment_name)
-    # print('Random states for {} are {}'.format(experiment_name, random_state))
+def find_experiment_random_states(run_identifier, **kwargs):
+    seed_identifier = EvaluationRunIdentifier.seed_identifier(run_identifier)
+    random_state = SEED_CONTROLLER.get_random_states(seed_identifier)
+    # print('Random states for {} are {}'.format(seed_identifier, random_state))
     return random_state
 
 
-def receive_metrics(**kwargs):
+def receive_metrics(run_identifier: EvaluationRunIdentifier, **kwargs):
     # TODO: Do something with kwargs['run']?
-    identifier = '{}_{}'.format(kwargs['experiment_name'], kwargs['challenge'])
+    # identifier = '{}_{}'.format(kwargs['experiment_name'], kwargs['challenge'])
+    identifier = EvaluationRunIdentifier.run_identifier(run_identifier)
     print('Received metrics from {}'.format(identifier))
     m = kwargs['value']
     metrics_msg = 'run: {} - accuracy: {} - precision: {} - recall: {} - f1: {}'.format(kwargs['run'], m['accuracy'], m['precision'], m['recall'], m['f1_score'])
@@ -98,38 +103,17 @@ def receive_metrics(**kwargs):
     specific_logger.debug(metrics_msg)
     return True
 
-DEFAULT_POPULATION_SIZE = 1_000
-def pair_stats_between_experiments(experiment_name_1, experiment_name_2, n_samples=DEFAULT_POPULATION_SIZE):
-    import scipy.stats
-    # metrics = {'accuracy', 'precision', 'recall', 'f1'}
-    # TODO: Change for logger store to save a numpy array and just load that instead of reading a log file
-    def aggregate_metric(experiment_name, metric):
-        aggregate_metric.positions = {'run': 0, 'accuracy': 1, 'precision': 2, 'recall': 3, 'f1': 4}
-        specific_logger = LOGGER_STORE.get_logger(experiment_name)
-        log_file = next(h for h in specific_logger.handlers if isinstance(h, logging.FileHandler)).baseFilename
-        arr = np.zeros((n_samples, ))
-        with open(log_file, 'r') as lf:
-            line = lf.readline()
-            while line != '':
-                splits = [metric_kv.split(': ') for metric_kv in line.split('-')]
-                run = int(splits[aggregate_metric.positions['run']][1])
-                metric_value = splits[aggregate_metric.positions[metric]][1]
-                arr[run] = float(metric_value)
-                line = lf.readline()
-        return arr
+def pair_stats_between_experiments(experiment_name_1: str, experiment_name_2: str, n_samples: int):
+    def file_handle_for_experiment(experiment_name):
+        specific_logger_experiment_1 = LOGGER_STORE.get_logger(experiment_name)
+        return next(h for h in specific_logger_experiment_1.handlers if isinstance(h, logging.FileHandler)).baseFilename
 
+    # TODO: Change for logger store to save a numpy array and just load that instead of reading a log file
+    experiment_1_file = file_handle_for_experiment(experiment_name_1)
+    experiment_2_file = file_handle_for_experiment(experiment_name_2)
+    
     metrics = ['f1', 'accuracy', 'precision', 'recall']
-    for metric in metrics:
-        print('-- Metric {} --'.format(metric))
-        m_1 = aggregate_metric(experiment_name_1, metric)
-        m_2 = aggregate_metric(experiment_name_2, metric)
-        # Our metrics are continuous, so correction for continuity?
-        w, p_w = scipy.stats.wilcoxon(m_1, m_2, correction=False)
-        mn, p_mn = scipy.stats.mannwhitneyu(m_1, m_2, use_continuity=False)
-        tv, p_t = scipy.stats.ttest_ind(m_1, m_2)
-        print('Wilcoxon p-value of ', p_w)
-        print('Mann-Whitney p-value of ', p_mn)
-        print('Student p-value of ', p_t)
+    print_pair_metrics_from_files(experiment_1_file, experiment_2_file, metrics)
 
 def save_current_info(signal, frame):
     print('Captured exit signal')
