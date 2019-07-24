@@ -44,6 +44,13 @@ def test(model, test_loader, logger):
     logger.train(metrics_msg)
     return np_pred, np_target
 
+def validate_args(args):
+    from pathlib import Path
+    if args.name == '':
+        raise ValueError('--name', 'name must not be empty')
+    if not Path(args.log_dir).exists():
+        raise IOError('Log dit {} does no exist'.format(args.log_dir))
+
 
 def parse_args():
     # Training settings
@@ -67,6 +74,7 @@ def parse_args():
     parser.add_argument('--save-model', action='store_true', default=False,
                         help='For Saving the current Model')
     args = parser.parse_args()
+    validate_args(args)
     return vars(args)
 
 
