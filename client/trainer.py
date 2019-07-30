@@ -49,12 +49,12 @@ def validate_args(args):
     if args.name == '':
         raise ValueError('--name', 'name must not be empty')
     if not Path(args.log_dir).exists():
-        raise IOError('Log dit {} does no exist'.format(args.log_dir))
+        raise IOError('Log dir {} does no exist'.format(args.log_dir))
 
 
 def parse_args():
     # Training settings
-    parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
+    parser = argparse.ArgumentParser(description='Deep Learning evaluation framework')
     parser.add_argument('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train (default: 10)')
     parser.add_argument('--use-cuda', action='store_true', default=False,
