@@ -1,9 +1,9 @@
-import argparse
 import logging
 import os
 from collections import namedtuple
 
 import numpy as np
+import configargparse
 import server_interactions
 import zmq
 from ml_evaluation_ipc_communication import EvaluationRunIdentifier
@@ -53,27 +53,30 @@ def validate_args(args):
 
 
 def parse_args():
-    # Training settings
-    parser = argparse.ArgumentParser(description='Deep Learning evaluation framework')
-    parser.add_argument('--epochs', type=int, default=10, metavar='N',
+    parser = configargparse.ArgParser(default_config_files=['.env.defaults'], description='Deep Learning evaluation framework')
+    parser.add('-c', '--my-config', is_config_file=True, help='config file path')
+    parser.add('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train (default: 10)')
-    parser.add_argument('--use-cuda', action='store_true', default=False,
+    parser.add('--use-cuda', action='store_true', default=False,
                         help='Forces CUDA training')
-    parser.add_argument('--log-interval', type=int, default=10, metavar='N',
+    parser.add('--log-interval', type=int, default=10, metavar='N',
                         help='how many batches to wait before logging training status')
-    parser.add_argument('--type', type=str, choices=['buggy', 'corrected', 'automl'],
+    parser.add('--evaluation-type', type=str, choices=['buggy', 'corrected', 'automl'],
                         required=True)
-    parser.add_argument('--resume-run-at', type=int, help='what run to resume training from')
-    parser.add_argument('--name', required=True, type=str)
-    # TODO: Put them required in the future
-    parser.add_argument('--challenge',  default="mnist", type=str)
-    parser.add_argument('--model-library',  default="pytorch", type=str)
-    parser.add_argument('--model-name',  default="Net", type=str)
-    parser.add_argument('--runs', required=True, type=int)
-    parser.add_argument('--log-dir', required=True, type=str)
-    parser.add_argument('--save-model', action='store_true', default=False,
-                        help='For Saving the current Model')
+    parser.add('--resume-run-at', type=int, help='what run to resume training from')
+    parser.add('--name', required=True, type=str)
+    parser.add('--challenge',  default="mnist", type=str, required=True)
+    # TODO: Put this as a choice (maybe dynamic?)
+    parser.add('--model-library',  default="pytorch", type=str, required=True)
+    parser.add('--model-name',  default="Net", type=str, required=True)
+    parser.add('--runs', required=True, type=int)
+    parser.add('--log-dir', required=True, type=str, env_var='CLIENT_LOG_DIR')
+    # Optional
+    parser.add('--save-model', action='store_true', default=False, help='For Saving the current Model')
+
     args = parser.parse_args()
+    print(parser.print_values())
+
     validate_args(args)
     return vars(args)
 
@@ -90,8 +93,8 @@ def run_experiment():
         # TODO put logger
         raise ValueError("CUDA was requested but CUDA is not available")
 
-    EXPERIMENT_NAME = '{}_{}'.format(args['name'], args['type'])
-    run_identifier = EvaluationRunIdentifier(name=args['name'], evaluation_type=args['type'], challenge=args['challenge'],  lib_name=args['model_library'], model_name=args['model_name'])
+    EXPERIMENT_NAME = '{}_{}'.format(args['name'], args['evaluation_type'])
+    run_identifier = EvaluationRunIdentifier(name=args['name'], evaluation_type=args['evaluation_type'], challenge=args['challenge'],  lib_name=args['model_library'], model_name=args['model_name'])
     logger = ExperimentLogger(EXPERIMENT_NAME, **args)
 
     # Get server connection
@@ -131,7 +134,7 @@ def run_experiment():
         server_interactions.send_metrics_for_run(socket, run_identifier, seed, run, metrics)
 
         if (args['save_model']):
-            model.save(evaluation_type=args['type'], run=run)
+            model.save(evaluation_type=args['evaluation_type'], run=run)
         log_params(model, logger)
 
 
