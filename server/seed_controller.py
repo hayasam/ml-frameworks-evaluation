@@ -2,8 +2,6 @@ import pickle
 from pathlib import Path
 
 import numpy as np
-from settings import (DEFAULT_MAX_SEED_VALUE, DEFAULT_MIN_SEED_VALUE,
-                      DEFAULT_MINIMAL_SEED_LEN)
 
 
 def init(value_min, value_max, value_count):
@@ -12,10 +10,11 @@ def init(value_min, value_max, value_count):
 class SeedController(object):
     """Mapping str -> [int]"""
     def __init__(self, **kwargs):
-        self.seed_len = kwargs.get('seed_len', DEFAULT_MINIMAL_SEED_LEN)
-        self.min_seed_value = kwargs.get('min_val', DEFAULT_MIN_SEED_VALUE)
-        self.max_seed_value = kwargs.get('max_val', DEFAULT_MAX_SEED_VALUE)
-        if self.seed_len < DEFAULT_MINIMAL_SEED_LEN:
+        self.seed_len = kwargs['seed_len']
+        self.min_seed_value = kwargs['min_val']
+        self.max_seed_value = kwargs['max_val']
+        # TODO: Hardcoded
+        if self.seed_len < 1000:
             raise ValueError('Seed length (seed_len) needs to be greater than 1,000')
         self._mapping = dict()
 

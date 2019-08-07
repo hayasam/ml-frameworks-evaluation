@@ -1,3 +1,4 @@
+ConfigArgParse==0.14.0
 joblib==0.13.2
 numpy==1.16.4
 Pillow-SIMD==6.0.0.post0

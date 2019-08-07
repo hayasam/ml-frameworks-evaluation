@@ -3,6 +3,7 @@ import logging
 import signal
 import sys
 import traceback
+import configargparse
 from datetime import datetime
 from pathlib import Path
 
@@ -12,16 +13,9 @@ import zmq
 from challenges import challenges as CHALLENGES
 from metrics_logger_store import MetricsLoggerStore
 from seed_controller import SeedController
-from settings import (METRICS_LOG_BASE_PATH, SEED_CONTROLLER_FILE,
-                      SERVER_ENDPOINT_CONNEXION, SERVER_LOG_FILE)
 from stats import print_pair_metrics_from_files
 from ml_evaluation_ipc_communication import EvaluationRunIdentifier
 
-SEED_CONTROLLER = SeedController.from_saved_file(SEED_CONTROLLER_FILE)
-LOGGER_STORE = MetricsLoggerStore(base_path=METRICS_LOG_BASE_PATH)
-SERVER_LOGGER = logging.getLogger('server')
-SERVER_LOGGER.addHandler(logging.FileHandler(SERVER_LOG_FILE))
-SERVER_LOGGER.setLevel(logging.DEBUG)
 
 def dataset_to_numpy(data_loader: torch.utils.data.DataLoader):
     data_x, data_y = [], []
@@ -119,8 +113,8 @@ def save_current_info(signal, frame):
     print('Captured exit signal')
     try:
         if 'SEED_CONTROLLER' in globals():
-            print('Saving SEED_CONTROLLER to {}'.format(SEED_CONTROLLER_FILE))
-            SEED_CONTROLLER.dump(SEED_CONTROLLER_FILE, overwrite=True)
+            print('Saving SEED_CONTROLLER to {}'.format(ARGS['seed_controller_file']))
+            SEED_CONTROLLER.dump(ARGS['seed_controller_file'], overwrite=True)
         SERVER_LOGGER.info('Server down and saved at {}'.format(str(datetime.now())))
     except Exception as e:
         print('ERROR in exit signal handler', e)
@@ -140,7 +134,7 @@ def setup_server_handlers(server):
     return request_handlers, response_handlers
 
 def start_server():
-    endpoint = SERVER_ENDPOINT_CONNEXION
+    endpoint = ARGS['data_server_connexion']
     context = zmq.Context()
     server = context.socket(zmq.PAIR)
     server.bind(endpoint)
@@ -169,5 +163,31 @@ def start_server():
 
     server.setsockopt(zmq.LINGER, 0) # Terminate early
 
+def parse_args():
+    parser = configargparse.ArgParser(default_config_files=['defaults.config'], description='Data server evaluation for Machine Learning Frameworks via IPC')
+    # Seed control
+    parser.add('--default-minimal-seed-len', required=True, type=int)
+    parser.add('--default-min-seed-value', required=True, type=int)
+    parser.add('--default-max-seed-value', required=True, type=int)
+    parser.add('--seed-controller-file', type=str, default='.seed_control.pickle')
+    # IPC communication
+    parser.add('--data-server-connexion', required=True, type=str, env_var='DATA_SERVER_ENDPOINT_CONNEXION')
+    # Logging control
+    parser.add('--server-log-file', type=str, default='server.log')
+    parser.add('--metrics-log-dir', type=str, default='.logs')
+
+    args = parser.parse_args()
+    parser.print_values()
+
+    return vars(args)
+
+
 if __name__ == "__main__":
+    ARGS = parse_args()
+    SEED_CONTROLLER = SeedController.from_saved_file(ARGS['seed_controller_file'])
+    LOGGER_STORE = MetricsLoggerStore(base_path=ARGS['metrics_log_dir'])
+    SERVER_LOGGER = logging.getLogger('server')
+    SERVER_LOGGER.addHandler(logging.FileHandler(ARGS['server_log_file']))
+    SERVER_LOGGER.setLevel(logging.DEBUG)
+
     start_server()
