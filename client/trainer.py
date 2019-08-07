@@ -13,9 +13,6 @@ from models.models_store import ModelStore
 from sklearn.metrics import (accuracy_score, f1_score, precision_score,
                              recall_score)
 
-# TODO: Create env file?
-DEFAULT_ENDPOINT = 'tcp://localhost:90002'
-DATA_SERVER_ENDPOINT = os.getenv('DATA_SERVER_ENDPOINT', DEFAULT_ENDPOINT)
 
 def log_params(model, logger):
     logger.parameters(model.get_params_str())
@@ -66,6 +63,7 @@ def parse_args():
     parser.add('--resume-run-at', type=int, help='what run to resume training from')
     parser.add('--name', required=True, type=str)
     parser.add('--challenge',  default="mnist", type=str, required=True)
+    parser.add('--data-server-endpoint', required=True, type=str, env_var='DATA_SERVER_ENDPOINT')
     # TODO: Put this as a choice (maybe dynamic?)
     parser.add('--model-library',  default="pytorch", type=str, required=True)
     parser.add('--model-name',  default="Net", type=str, required=True)
@@ -98,7 +96,7 @@ def run_experiment():
     logger = ExperimentLogger(EXPERIMENT_NAME, **args)
 
     # Get server connection
-    socket, context = connect_server(DATA_SERVER_ENDPOINT)
+    socket, context = connect_server(args['data_server_endpoint'])
 
     # Request server for seed
     seed = server_interactions.request_seed(socket, run_identifier)
@@ -147,7 +145,7 @@ def recv_array(socket, flags=0, copy=True, track=False):
     return A.reshape(md['shape'])
 
 
-def connect_server(endpoint=DEFAULT_ENDPOINT):
+def connect_server(endpoint):
     # TODO: Connect args
     print('Connecting to {}'.format(endpoint))
     context = zmq.Context()
