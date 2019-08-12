@@ -63,9 +63,21 @@ def get_data_for_challenge_seed(challenge_name: str, seed: int, run: int, train_
                                                      test_batch_size=test_batch_size)
     np_train = dataset_to_numpy(train_loader)
     np_test = dataset_to_numpy(test_loader)
-    shuffled_train = shuffle_dataset(np_train[0], np_train[1], seed)
-    shuffled_test = shuffle_dataset(np_test[0], np_test[1], seed)
+    shuffled_train = cut_data_for_experiment(shuffle_dataset(np_train[0], np_train[1], seed), 0.5)
+    shuffled_test = cut_data_for_experiment(shuffle_dataset(np_test[0], np_test[1], seed), 0.5)
     return shuffled_train, shuffled_test
+
+def cut_data_for_experiment(np_set, proportion: float = 0.5):
+    """Reduces the `train_data` and `test_data` to a proportion.
+        Mainly used because we don't want to use the whole (sub-) dataset.
+    """
+    assert proportion > 0.0 and proportion < 1.0
+    assert len(np_set[0]) == len(np_set[1])
+    x, y = np_set
+    current_len = len(np_set[0])
+    new_len = max(1, current_len // 2)
+    return x[:new_len], y[:new_len]
+
 
 # From ZeroMQ's doc
 def send_array(socket, A, flags=0, copy=True, track=False):
