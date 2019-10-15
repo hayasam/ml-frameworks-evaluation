@@ -5,6 +5,23 @@
 PY_CACHE_DIR=${PY_CACHE_DIR:-/pip_cache}
 SERVER_PY_VERSION="${SERVER_PY_VERSION:-3.6.8}"
 SERVER_VENV_NAME="server-venv"
+SERVER_LOG_FILE="${SERVER_LOG_FILE:?}"
+SEED_CONTROLLER_FILE="${SEED_CONTROLLER_FILE:?}"
+
+if [ ! -d "${METRICS_LOG_DIR:?}" ]; then
+  echo "Specified directory for logs does not exist!"
+  exit 1
+fi
+
+if [ ! -d "$(dirname $SERVER_LOG_FILE)" ]; then
+  echo "Specified directory for server log file does not exist!"
+  exit 1
+fi
+
+if [ ! -d "$(dirname $SEED_CONTROLLER_FILE)" ]; then
+  echo "Specified directory for seed controller file does not exist!"
+  exit 1
+fi
 
 # Setting PIP_FIND_LINKS will allow to check the local
 # directory
@@ -29,4 +46,4 @@ fi
 pip install ../shared
 pip install -r requirements.txt
 echo "Starting server..."
-python data_server.py &
+python data_server.py --metrics-log-dir "$METRICS_LOG_DIR" --server-log-file "$SERVER_LOG_FILE" --seed-controller-file "$SEED_CONTROLLER_FILE" &
