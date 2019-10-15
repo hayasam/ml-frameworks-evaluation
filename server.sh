@@ -6,16 +6,6 @@ PY_CACHE_DIR=${PY_CACHE_DIR:-/pip_cache}
 SERVER_PY_VERSION="${SERVER_PY_VERSION:-3.6.8}"
 SERVER_VENV_NAME="server-venv"
 
-if [ -z "${BUILD_DIR+x}" ]; then
-  BUILD_DIR="/builds/$CUDA_VERSION"
-  if [ -z "${CUDA_VERSION+x}" ]; then
-    echo 'Need to set env variable CUDA_VERSION if BUILD_DIR is not set'
-    echo 'exiting...'
-    exit 1
-  fi
-  echo "BUILD_DIR not set, using value $BUILD_DIR"
-fi
-
 # Setting PIP_FIND_LINKS will allow to check the local
 # directory
 PIP_FIND_LINKS="$PY_CACHE_DIR $PIP_FIND_LINKS"
