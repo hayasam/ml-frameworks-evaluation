@@ -1,27 +1,18 @@
 #!/usr/bin/env bash
 
-# Set CLIENT_PY_VERSION
-# Set PY_CACHE_DIR
-# Set CLIENT_MANUAL_DEPENDENCY
-# Set EXPERIMENT_NAME
-# Set EVALUATION_TYPE
-# Set CHALLENGE MODEL_LIBRARY MODEL_NAME CLIENT_LOG_DIR --runs 1000
-CLIENT_VENV_NAME="$EXPERIMENT_NAME"
-
-if [ -z "${CLIENT_MANUAL_DEPENDENCY+x}" ]; then
-  echo 'Please set a value for $CLIENT_MANUAL_DEPENDENCY'
-  exit 1
-fi
-
-if [ -z "${EXPERIMENT_NAME+x}" ]; then
-  echo 'Please set a value for $EXPERIMENT_NAME'
-  exit 1
-fi
-
-if [ -z "${CLIENT_PY_VERSION+x}" ]; then
-  echo 'Please set a value for $CLIENT_PY_VERSION'
-  exit 1
-fi
+# TODO: Check how these variables should be set
+EXPERIMENT_NAME="${EXPERIMENT_NAME:?}"
+CLIENT_VENV_NAME="${EXPERIMENT_NAME:?}"
+CLIENT_MANUAL_DEPENDENCY="${CLIENT_MANUAL_DEPENDENCY:?}"
+CLIENT_PY_VERSION="${CLIENT_PY_VERSION:?}"
+EVALUATION_TYPE="${EVALUATION_TYPE:?}"
+CHALLENGE="${CHALLENGE:?}"
+MODEL_LIBRARY="${MODEL_LIBRARY:?}"
+MODEL_NAME="${MODEL_NAME:?}"
+CLIENT_LOG_DIR="${CLIENT_LOG_DIR:?}"
+NUMBER_OF_RUNS="${NUMBER_OF_RUNS:?}"
+PY_CACHE_DIR=${PY_CACHE_DIR:-/pip_cache}
+DATA_SERVER_ENDPOINT="${DATA_SERVER_ENDPOINT:?}"
 
 # Setting PIP_FIND_LINKS will allow to check the local
 # directory
@@ -59,4 +50,4 @@ fi
 pip install "${MANUAL_WHL[0]}"
 echo "Starting client..."
 # Note: runs should maybe be parameterized?
-python trainer.py --type "$EVALUATION_TYPE" --name "$EXPERIMENT_NAME" --challenge "$CHALLENGE" --model-library "$MODEL_LIBRARY" --model-name "$MODEL_NAME" --log-dir "$CLIENT_LOG_DIR" --runs 1000 &
+python trainer.py --evaluation-type "$EVALUATION_TYPE" --name "$EXPERIMENT_NAME" --challenge "$CHALLENGE" --model-library "$MODEL_LIBRARY" --model-name "$MODEL_NAME" --log-dir "$CLIENT_LOG_DIR" --runs "$NUMBER_OF_RUNS" &

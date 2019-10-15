@@ -2,8 +2,8 @@
 
 # TODO: Maybe check if dependencies are already satisfied
 # Set PY_CACHE_DIR
-
-SERVER_PY_VERSION=3.6.8
+PY_CACHE_DIR=${PY_CACHE_DIR:-/pip_cache}
+SERVER_PY_VERSION="${SERVER_PY_VERSION:-3.6.8}"
 SERVER_VENV_NAME="server-venv"
 
 if [ -z "${BUILD_DIR+x}" ]; then
@@ -16,15 +16,9 @@ if [ -z "${BUILD_DIR+x}" ]; then
   echo "BUILD_DIR not set, using value $BUILD_DIR"
 fi
 
-if [ -z "${SERVER_PY_VERSION+x}" ]; then
-  echo 'Please set a value for $SERVER_PY_VERSION'
-  exit 1
-fi
-
 # Setting PIP_FIND_LINKS will allow to check the local
 # directory
 PIP_FIND_LINKS="$PY_CACHE_DIR $PIP_FIND_LINKS"
-
 
 #
 # Server configuration
