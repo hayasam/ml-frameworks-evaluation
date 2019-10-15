@@ -13,6 +13,7 @@ CLIENT_LOG_DIR="${CLIENT_LOG_DIR:?}"
 NUMBER_OF_RUNS="${NUMBER_OF_RUNS:?}"
 PY_CACHE_DIR=${PY_CACHE_DIR:-/pip_cache}
 DATA_SERVER_ENDPOINT="${DATA_SERVER_ENDPOINT:?}"
+USE_BUILD_MKL="${USE_BUILD_MKL:-0}"
 
 # Setting PIP_FIND_LINKS will allow to check the local
 # directory
@@ -29,6 +30,10 @@ if [ -z "${BUILD_DIR+x}" ]; then
   echo "BUILD_DIR not set, using value $BUILD_DIR"
 fi
 
+if [ "$USE_BUILD_MKL" -eq 1 ]; then
+  echo "Adding /builds/mkl to LD_LIBRARY_PATH"
+  export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/builds/mkl"
+fi
 
 #
 # Client configuration
