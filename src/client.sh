@@ -43,7 +43,14 @@ cd client
 pyenv local "$CLIENT_PY_VERSION"
 python -m venv ".venvs/$CLIENT_VENV_NAME"
 source ".venvs/$CLIENT_VENV_NAME/bin/activate"
+
+# Create temporary file that pip will read in order to allow caching
+echo "[global]" >> .pip.config
+echo "cache-dir = $PY_CACHE_DIR" >> .pip.config
+export PIP_CONFIG_FILE=".pip.config"
+
 pip install ../shared
+pip install --upgrade pip
 pip install -r partial_requirements.txt
 # Need also to install the built library
 MANUAL_WHL=( $(find $BUILD_DIR -type f -name "*$CLIENT_MANUAL_DEPENDENCY*.whl") )
