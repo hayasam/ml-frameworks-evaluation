@@ -78,6 +78,12 @@ def parse_args():
     validate_args(args)
     return vars(args)
 
+def check_cuda_availability(model_library):
+    if model_library == 'pytorch':
+        import torch
+        return torch.cuda.is_available()
+    else:
+        raise ValueError('Library {} is not yet supported'.format(model_library))
 
 def run_experiment():
     args = parse_args()
@@ -87,9 +93,9 @@ def run_experiment():
     runtime_params = {k:v for k,v in args.items() if k in runtime_params_keys}
     print('Runtime params', runtime_params)
 
-    if args['use_cuda'] and not torch.cuda.is_available():
-        # TODO put logger
-        raise ValueError("CUDA was requested but CUDA is not available")
+    if args['use_cuda']:
+        if not check_cuda_availability(args['model_library']):
+            raise ValueError("CUDA was requested but CUDA is not available")
 
     EXPERIMENT_NAME = '{}_{}'.format(args['name'], args['evaluation_type'])
     run_identifier = EvaluationRunIdentifier(name=args['name'], evaluation_type=args['evaluation_type'], challenge=args['challenge'],  lib_name=args['model_library'], model_name=args['model_name'])
