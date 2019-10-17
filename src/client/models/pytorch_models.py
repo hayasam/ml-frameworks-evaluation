@@ -60,6 +60,8 @@ class Net(EvaluationModel, nn.Module):
 
     def train_on_data(self, train_data, current_epoch, logger, **kwargs):
         self.train()
+        if self.use_cuda:
+            self.cuda()
         train_x, train_y = train_data
         # print(train_x.shape, train_y.shape)
         for batch_idx, (np_data, np_target) in enumerate(zip(train_x, train_y)):
