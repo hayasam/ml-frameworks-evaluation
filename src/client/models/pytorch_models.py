@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.hub import load_state_dict_from_url
 
 from .base_model import EvaluationModel
 from .weight_initializers import initialize_torch_weights_apply_fn
@@ -303,6 +302,7 @@ def _vgg(arch, cfg, batch_norm, pretrained, progress, **kwargs):
         kwargs['init_weights'] = False
     model = _VGGG(make_layers(cfgs[cfg], batch_norm=batch_norm), **kwargs)
     if pretrained:
+        from torch.hub import load_state_dict_from_url
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
         model.load_state_dict(state_dict)
