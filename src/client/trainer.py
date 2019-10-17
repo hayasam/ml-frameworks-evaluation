@@ -55,7 +55,7 @@ def parse_args():
     parser.add('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train (default: 10)')
     parser.add('--use-cuda', action='store_true', default=False,
-                        help='Forces CUDA training')
+                        help='Forces CUDA training', env_var='USE_CUDA')
     parser.add('--log-interval', type=int, default=10, metavar='N',
                         help='how many batches to wait before logging training status')
     parser.add('--evaluation-type', type=str, choices=['buggy', 'corrected', 'automl'],
