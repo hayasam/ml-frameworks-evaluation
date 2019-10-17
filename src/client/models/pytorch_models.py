@@ -400,3 +400,168 @@ def vgg19_bn(pretrained=False, progress=True, **kwargs):
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _vgg('vgg19_bn', 'E', True, pretrained, progress, **kwargs)
+
+__all__ = ['AlexNet', 'alexnet']
+
+model_urls = {
+    'alexnet': 'https://download.pytorch.org/models/alexnet-owt-4df8aa71.pth',
+}
+
+class EvaluationAlex(EvaluationModel):
+    def __init__(self, cfg='A', **kwargs):
+        super(EvaluationAlex, self).__init__()
+        # TODO: Parametrize loss?
+        self.loss_fn = F.nll_loss
+        # TODO: Check why this was 512 before and now 1
+        self.use_cuda = kwargs['use_gpu']
+        self.device = torch.device('cuda' if self.use_cuda else 'cpu')
+        self.optimizer_params = kwargs.get('optimizer_params', {
+            'lr': 0.01,
+            'momentum': 0.5
+        })
+        self._data_params = {'train_batch_size': 64, 'test_batch_size': 1000}
+        # TODO: Parametrize this
+        vgg_params = { 'num_classes': 10 }
+        # TODO: Parametrize this
+        self.vgg_model = vgg11(False, False, **vgg_params)
+
+    
+    def get_params_str(self):
+        # TODO: Get all layers
+        p = []
+        for m in self.vgg_model.modules():
+            if hasattr(m, 'weight') and isinstance(m.weight, torch.nn.parameter.Parameter):
+                p.append(str(m.weight))
+        return '\n'.join(p)
+
+    def start_training(self):
+        self.optimizer = optim.SGD(self.vgg_model.parameters(), **self.optimizer_params)
+    
+    def get_data_params(self):
+        return self._data_params
+
+    def train_on_data(self, train_data, current_epoch, logger, **kwargs):
+        # Say to pytorch we are in training mode
+        self.vgg_model.train()
+
+        if self.use_cuda:
+            self.vgg_model.cuda()
+        train_x, train_y = train_data
+        # print(train_x.shape, train_y.shape)
+        for batch_idx, (np_data, np_target) in enumerate(zip(train_x, train_y)):
+            # TODO: Remove this hack
+            _new_data = np.repeat(np_data, 3, 1)
+            # print('Original shape:', np_data.shape, 'View Shape:', _new_data.shape)
+            data, target = torch.from_numpy(_new_data), torch.from_numpy(np_target)
+
+            data, target = data.to(self.device), target.to(self.device)
+            self.optimizer.zero_grad()
+            output = self.vgg_model(data)
+            loss = self.loss_fn(output, target)
+            loss.backward()
+            self.optimizer.step()
+            if batch_idx % kwargs['log_interval'] == 0:
+                message = 'Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                current_epoch, batch_idx * train_x.shape[1], train_y.size,
+                100. * batch_idx / train_x.shape[0], loss.item())
+                logger.train(message)
+
+    def test_on_data(self, test_data, logger, **kwargs):
+        """Must return a tuple (np_predictions, np_target)"""
+        self.vgg_model.eval()
+        test_loss = 0
+        correct = 0
+        test_x, test_y = test_data
+        preds = []
+        with torch.no_grad():
+            for np_data, np_target in zip(test_x, test_y):
+                # TODO: Remove this hack
+                _new_data = np.repeat(np_data, 3, 1)
+                data, target = torch.from_numpy(_new_data), torch.from_numpy(np_target)
+
+                
+                data, target = data.to(self.device), target.to(self.device)
+                output = self.vgg_model(data)
+                test_loss += self.loss_fn(output, target, reduction='sum').item() # sum up batch loss
+                pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
+                correct += pred.eq(target.view_as(pred)).sum().item()
+                preds.append(pred.cpu().numpy())
+        total_n_examples = test_y.size
+        test_loss /= total_n_examples
+
+        message = '\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+            test_loss, correct, total_n_examples,
+            100. * correct / total_n_examples)
+        logger.train(message)
+
+        np_pred = np.array(preds).ravel()
+        np_target = test_y.ravel()
+        
+        return np_pred, np_target
+
+    def initialize_weights(self, random_state: int = 0): # removed the underscore in original name _initialize_weights
+        # TODO check if we need to set the random_state
+        for m in self.vgg_model.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                nn.init.constant_(m.bias, 0)
+
+class _AlexNet(nn.Module):
+
+    def __init__(self, features, num_classes=1000, **kwargs):
+        super(AlexNet, self).__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+            nn.Conv2d(64, 192, kernel_size=5, padding=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+            nn.Conv2d(192, 384, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(384, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
+        self.classifier = nn.Sequential(
+            nn.Dropout(),
+            nn.Linear(256 * 6 * 6, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Linear(4096, 4096),
+            nn.ReLU(inplace=True),
+            nn.Linear(4096, num_classes),
+        )
+
+    def forward(self, x):
+        x = self.features(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
+
+
+def alexnet(pretrained=False, progress=True, **kwargs):
+    r"""AlexNet model architecture from the
+    `"One weird trick..." <https://arxiv.org/abs/1404.5997>`_ paper.
+
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    model = AlexNet(**kwargs)
+    if pretrained:
+        state_dict = load_state_dict_from_url(model_urls['alexnet'],
+                                              progress=progress)
+        model.load_state_dict(state_dict)
+    return model
