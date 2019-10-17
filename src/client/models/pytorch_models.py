@@ -421,42 +421,42 @@ class EvaluationAlex(EvaluationModel):
         })
         self._data_params = {'train_batch_size': 64, 'test_batch_size': 1000}
         # TODO: Parametrize this
-        vgg_params = { 'num_classes': 10 }
+        alex_params = { 'num_classes': 10 }
         # TODO: Parametrize this
-        self.vgg_model = vgg11(False, False, **vgg_params)
+        self.alex_model = alexnet(False, False, **alex_params)
 
     
     def get_params_str(self):
         # TODO: Get all layers
         p = []
-        for m in self.vgg_model.modules():
+        for m in self.alex_model.modules():
             if hasattr(m, 'weight') and isinstance(m.weight, torch.nn.parameter.Parameter):
                 p.append(str(m.weight))
         return '\n'.join(p)
 
     def start_training(self):
-        self.optimizer = optim.SGD(self.vgg_model.parameters(), **self.optimizer_params)
+        self.optimizer = optim.SGD(self.alex_model.parameters(), **self.optimizer_params)
     
     def get_data_params(self):
         return self._data_params
 
     def train_on_data(self, train_data, current_epoch, logger, **kwargs):
         # Say to pytorch we are in training mode
-        self.vgg_model.train()
+        self.alex_model.train()
 
         if self.use_cuda:
-            self.vgg_model.cuda()
+            self.alex_model.cuda()
         train_x, train_y = train_data
         # print(train_x.shape, train_y.shape)
         for batch_idx, (np_data, np_target) in enumerate(zip(train_x, train_y)):
             # TODO: Remove this hack
-            _new_data = np.repeat(np_data, 3, 1)
+            _new_data = np.repeat(np.repeat(np.repeat(np_data, 8, 2), 8, 3), 3, 1)
             # print('Original shape:', np_data.shape, 'View Shape:', _new_data.shape)
             data, target = torch.from_numpy(_new_data), torch.from_numpy(np_target)
 
             data, target = data.to(self.device), target.to(self.device)
             self.optimizer.zero_grad()
-            output = self.vgg_model(data)
+            output = self.alex_model(data)
             loss = self.loss_fn(output, target)
             loss.backward()
             self.optimizer.step()
@@ -468,7 +468,7 @@ class EvaluationAlex(EvaluationModel):
 
     def test_on_data(self, test_data, logger, **kwargs):
         """Must return a tuple (np_predictions, np_target)"""
-        self.vgg_model.eval()
+        self.alex_model.eval()
         test_loss = 0
         correct = 0
         test_x, test_y = test_data
@@ -476,12 +476,10 @@ class EvaluationAlex(EvaluationModel):
         with torch.no_grad():
             for np_data, np_target in zip(test_x, test_y):
                 # TODO: Remove this hack
-                _new_data = np.repeat(np_data, 3, 1)
+                _new_data = np.repeat(np.repeat(np.repeat(np_data, 8, 2), 8, 3), 3, 1)
                 data, target = torch.from_numpy(_new_data), torch.from_numpy(np_target)
-
-                
                 data, target = data.to(self.device), target.to(self.device)
-                output = self.vgg_model(data)
+                output = self.alex_model(data)
                 test_loss += self.loss_fn(output, target, reduction='sum').item() # sum up batch loss
                 pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
                 correct += pred.eq(target.view_as(pred)).sum().item()
@@ -501,7 +499,7 @@ class EvaluationAlex(EvaluationModel):
 
     def initialize_weights(self, random_state: int = 0): # removed the underscore in original name _initialize_weights
         # TODO check if we need to set the random_state
-        for m in self.vgg_model.modules():
+        for m in self.alex_model.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
                 if m.bias is not None:
@@ -515,8 +513,8 @@ class EvaluationAlex(EvaluationModel):
 
 class _AlexNet(nn.Module):
 
-    def __init__(self, features, num_classes=1000, **kwargs):
-        super(AlexNet, self).__init__()
+    def __init__(self, num_classes=1000, **kwargs):
+        super(_AlexNet, self).__init__()
         self.features = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2),
             nn.ReLU(inplace=True),
@@ -548,8 +546,7 @@ class _AlexNet(nn.Module):
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.classifier(x)
-        return x
-
+        return F.log_softmax(x, dim=1)
 
 def alexnet(pretrained=False, progress=True, **kwargs):
     r"""AlexNet model architecture from the
@@ -559,7 +556,7 @@ def alexnet(pretrained=False, progress=True, **kwargs):
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    model = AlexNet(**kwargs)
+    model = _AlexNet(**kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls['alexnet'],
                                               progress=progress)
