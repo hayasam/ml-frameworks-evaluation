@@ -69,6 +69,8 @@ def parse_args():
     parser.add('--model-library',  default="pytorch", type=str, required=True)
     parser.add('--model-name',  default="Net", type=str, required=True)
     parser.add('--runs', required=True, type=int)
+    # TODO: Change when supporting more classification problems
+    parser.add('--num-classes', required=True, type=int)
     parser.add('--log-dir', required=True, type=str, env_var='CLIENT_LOG_DIR')
     # Optional
     parser.add('--save-model', action='store_true', default=False, help='For Saving the current Model')
@@ -113,7 +115,7 @@ def run_experiment():
         current_seed = seed[run]
         # Local seed is indexed at the run
         set_local_seed(current_seed)
-        model_creation_args = {'use_gpu': args['use_cuda']}
+        model_creation_args = {'use_gpu': args['use_cuda'], 'num_classes': args['num_classes']}
         # Recreate the net for each run with new initial weights
         model = ModelStore.get_model_for_name(library=args['model_library'], name=args['model_name'], **model_creation_args)
         model.initialize_weights(current_seed)

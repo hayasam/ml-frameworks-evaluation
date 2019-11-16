@@ -14,7 +14,7 @@ class Net(EvaluationModel, nn.Module):
         self.conv1 = nn.Conv2d(1, 20, 5, 1)
         self.conv2 = nn.Conv2d(20, 50, 5, 1)
         self.fc1 = nn.Linear(4*4*50, 500)
-        self.fc2 = nn.Linear(500, 10)
+        self.fc2 = nn.Linear(500, kwargs['num_classes'])
         self.use_cuda = kwargs['use_gpu']
         self.optimizer_params = kwargs.get('optimizer_params', {
             'lr': 0.01,
@@ -120,7 +120,7 @@ class EvaluationVGG(EvaluationModel):
         })
         self._data_params = {'train_batch_size': 64, 'test_batch_size': 1000}
         # TODO: Parametrize this
-        vgg_params = { 'num_classes': 10 }
+        vgg_params = { 'num_classes': kwargs['num_classes'] }
         # TODO: Parametrize this
         self.vgg_model = vgg11(False, False, **vgg_params)
 
@@ -423,7 +423,7 @@ class EvaluationAlex(EvaluationModel):
         })
         self._data_params = {'train_batch_size': 64, 'test_batch_size': 1000}
         # TODO: Parametrize this
-        alex_params = { 'num_classes': 10 }
+        alex_params = { 'num_classes': kwargs['num_classes'] }
         # TODO: Parametrize this
         self.alex_model = alexnet(False, False, **alex_params)
 
