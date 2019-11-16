@@ -6,6 +6,7 @@ CLIENT_VENV_NAME="${EXPERIMENT_NAME:?}"
 CLIENT_MANUAL_DEPENDENCY="${CLIENT_MANUAL_DEPENDENCY:?}"
 CLIENT_PY_VERSION="${CLIENT_PY_VERSION:?}"
 EVALUATION_TYPE="${EVALUATION_TYPE:?}"
+NUM_CLASSES="${NUM_CLASSES:?}"
 CHALLENGE="${CHALLENGE:?}"
 MODEL_LIBRARY="${MODEL_LIBRARY:?}"
 MODEL_NAME="${MODEL_NAME:?}"
@@ -62,4 +63,4 @@ fi
 pip install "${MANUAL_WHL[0]}"
 echo "Starting client..."
 # Note: runs should maybe be parameterized?
-python trainer.py --evaluation-type "$EVALUATION_TYPE" --name "$EXPERIMENT_NAME" --challenge "$CHALLENGE" --model-library "$MODEL_LIBRARY" --model-name "$MODEL_NAME" --log-dir "$CLIENT_LOG_DIR" --runs "$NUMBER_OF_RUNS"
+python trainer.py --evaluation-type "$EVALUATION_TYPE" --name "$EXPERIMENT_NAME" --challenge "$CHALLENGE" --model-library "$MODEL_LIBRARY" --model-name "$MODEL_NAME" --log-dir "$CLIENT_LOG_DIR" --runs "$NUMBER_OF_RUNS" --num-classes "$NUM_CLASSES"
