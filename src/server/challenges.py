@@ -1,5 +1,6 @@
 import abc
 import torch
+from pathlib import Path
 from torchvision import datasets, transforms
 
 DEFAULT_DATA_ROOT = './data'
@@ -64,7 +65,8 @@ class CIFARChallenge(Challenge):
 
 
 def get_challenges(data_root: str, download=DEFAULT_DATASET_DOWNLOAD):
+    basepath = Path(data_root)
     challenges = dict()
-    challenges['mnist'] = MNISTChallenge(data_root=data_root, download=download)
-    challenges['cifar'] = CIFARChallenge(data_root=data_root, download=download)
+    challenges['mnist'] = MNISTChallenge(data_root=basepath / 'mnist', download=download)
+    challenges['cifar'] = CIFARChallenge(data_root=basepath / 'cifar', download=download)
     return challenges
