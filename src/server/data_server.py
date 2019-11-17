@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import zmq
-from challenges import challenges as CHALLENGES
+from challenges import get_challenges
 from metrics_logger_store import MetricsLoggerStore
 from seed_controller import SeedController
 from stats import print_pair_metrics_from_files
@@ -181,6 +181,7 @@ def parse_args():
     parser.add('--default-minimal-seed-len', required=True, type=int)
     parser.add('--default-min-seed-value', required=True, type=int)
     parser.add('--default-max-seed-value', required=True, type=int)
+    parser.add('--data-root', required=True, type=str, env_var='DATA_SERVER_DATA_ROOT', default='./data')
     parser.add('--seed-controller-file', type=str, default='.seed_control.pickle')
     # IPC communication
     parser.add('--data-server-connexion', required=True, type=str, env_var='DATA_SERVER_ENDPOINT_CONNEXION')
@@ -196,6 +197,7 @@ def parse_args():
 
 if __name__ == "__main__":
     ARGS = parse_args()
+    CHALLENGES = get_challenges(ARGS['data_root'])
     non_existing_kwargs = {'seed_len': ARGS['default_minimal_seed_len'], 'min_val': ARGS['default_min_seed_value'], 'max_val': ARGS['default_max_seed_value']}
     SEED_CONTROLLER = SeedController.from_saved_file(ARGS['seed_controller_file'], **non_existing_kwargs)
     LOGGER_STORE = MetricsLoggerStore(base_path=ARGS['metrics_log_dir'])

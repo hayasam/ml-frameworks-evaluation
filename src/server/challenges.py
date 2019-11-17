@@ -2,20 +2,27 @@ import abc
 import torch
 from torchvision import datasets, transforms
 
+DEFAULT_DATA_ROOT = './data'
+DEFAULT_DATASET_DOWNLOAD = True
+
 class Challenge(abc.ABC):
     def __init__(self, **kwargs):
-        pass
+        self.data_root = kwargs.get('data_root', DEFAULT_DATA_ROOT)
+        self.download = kwargs.get('download', DEFAULT_DATASET_DOWNLOAD)
     
-    @staticmethod
+    @abc.abstractmethod
     def get_subset(run: int, seed: int, train_batch_size: int, test_batch_size: int):
         pass
 
 class MNISTChallenge(Challenge):
-    @staticmethod
-    def get_subset(run: int, seed: int, train_batch_size: int, test_batch_size: int):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def get_subset(self, run: int, seed: int, train_batch_size: int, test_batch_size: int):
         # TODO: Something with params
         train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('./data', train=True, download=True,
+        datasets.MNIST(self.data_root, train=True, download=self.download,
                         transform=transforms.Compose([
                             transforms.ToTensor(),
                             transforms.Normalize((0.1307,), (0.3081,)),
@@ -23,7 +30,7 @@ class MNISTChallenge(Challenge):
                         ])),
         batch_size=train_batch_size, shuffle=False, drop_last=True)    
         test_loader = torch.utils.data.DataLoader(
-            datasets.MNIST('./data', train=False, transform=transforms.Compose([
+            datasets.MNIST(self.data_root, train=False, transform=transforms.Compose([
                             transforms.ToTensor(),
                             transforms.Normalize((0.1307,), (0.3081,)),
                             # transforms.Lambda(lambda v: v.numpy())
@@ -32,11 +39,14 @@ class MNISTChallenge(Challenge):
         return train_loader, test_loader
 
 class CIFARChallenge(Challenge):
-    @staticmethod
-    def get_subset(run: int, seed: int, train_batch_size: int, test_batch_size: int):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def get_subset(self, run: int, seed: int, train_batch_size: int, test_batch_size: int):
         # TODO: Something with params
         train_loader = torch.utils.data.DataLoader(
-        datasets.CIFAR10('./data', train=True, download=True,
+        datasets.CIFAR10(self.data_root, train=True, download=self.download,
                         transform=transforms.Compose([
                             transforms.ToTensor(),
                             transforms.Normalize((0.1307,), (0.3081,)),
@@ -44,7 +54,7 @@ class CIFARChallenge(Challenge):
                         ])),
         batch_size=train_batch_size, shuffle=False, drop_last=True)
         test_loader = torch.utils.data.DataLoader(
-            datasets.CIFAR10('./data', train=False, transform=transforms.Compose([
+            datasets.CIFAR10(self.data_root, train=False, transform=transforms.Compose([
                             transforms.ToTensor(),
                             transforms.Normalize((0.1307,), (0.3081,)),
                             # transforms.Lambda(lambda v: v.numpy())
@@ -53,6 +63,8 @@ class CIFARChallenge(Challenge):
         return train_loader, test_loader
 
 
+def get_challenges(data_root: str, download=DEFAULT_DATASET_DOWNLOAD):
 challenges = dict()
-challenges['mnist'] = MNISTChallenge()
-challenges['cifar'] = CIFARChallenge()
+    challenges['mnist'] = MNISTChallenge(data_root=data_root, download=download)
+    challenges['cifar'] = CIFARChallenge(data_root=data_root, download=download)
+    return challenges
