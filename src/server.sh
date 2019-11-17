@@ -7,6 +7,7 @@ SERVER_PY_VERSION="${SERVER_PY_VERSION:-3.6.8}"
 SERVER_VENV_NAME="server-venv"
 SERVER_LOG_FILE="${SERVER_LOG_FILE:?}"
 SEED_CONTROLLER_FILE="${SEED_CONTROLLER_FILE:?}"
+DATA_SERVER_DATA_ROOT="${DATA_SERVER_DATA_ROOT:?}"
 
 if [ ! -d "${METRICS_LOG_DIR:?}" ]; then
   echo "Specified directory for logs does not exist!"
@@ -47,4 +48,4 @@ fi
 pip install ../shared
 pip install -r requirements.txt
 echo "Starting server..."
-python data_server.py --metrics-log-dir "$METRICS_LOG_DIR" --server-log-file "$SERVER_LOG_FILE" --seed-controller-file "$SEED_CONTROLLER_FILE"
+python data_server.py --metrics-log-dir "$METRICS_LOG_DIR" --server-log-file "$SERVER_LOG_FILE" --seed-controller-file "$SEED_CONTROLLER_FILE" --data-root "$DATA_SERVER_DATA_ROOT"
