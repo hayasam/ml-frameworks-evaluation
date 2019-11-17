@@ -119,8 +119,9 @@ class EvaluationVGG(EvaluationModel):
             'momentum': 0.5
         })
         self._data_params = {'train_batch_size': 64, 'test_batch_size': 1000}
+        self.n_channels = kwargs.get('n_channels', 3)
         # TODO: Parametrize this
-        vgg_params = { 'num_classes': kwargs['num_classes'] }
+        vgg_params = { 'num_classes': kwargs['num_classes'], 'n_channels': self.n_channels}
         # TODO: Parametrize this
         self.vgg_model = vgg11(False, False, **vgg_params)
 
@@ -147,10 +148,13 @@ class EvaluationVGG(EvaluationModel):
         train_x, train_y = train_data
         # print(train_x.shape, train_y.shape)
         for batch_idx, (np_data, np_target) in enumerate(zip(train_x, train_y)):
-            # TODO: Remove this hack
-            _new_data = np.repeat(np_data, 3, 1)
-            # print('Original shape:', np_data.shape, 'View Shape:', _new_data.shape)
-            data, target = torch.from_numpy(_new_data), torch.from_numpy(np_target)
+            # TODO: This assumes the data received only as one channel, so we can repeat the dimensions.
+            if np_data.shape[1] == self.n_channels:
+                real_data = np_data # Do nothing as right amount of channels in input
+            else:
+                real_data = np.repeat(np_data, self.n_channels, 1)
+                # print('Original shape:', np_data.shape, 'View Shape:', real_data.shape)
+            data, target = torch.from_numpy(real_data), torch.from_numpy(np_target)
 
             data, target = data.to(self.device), target.to(self.device)
             self.optimizer.zero_grad()
@@ -173,11 +177,14 @@ class EvaluationVGG(EvaluationModel):
         preds = []
         with torch.no_grad():
             for np_data, np_target in zip(test_x, test_y):
-                # TODO: Remove this hack
-                _new_data = np.repeat(np_data, 3, 1)
-                data, target = torch.from_numpy(_new_data), torch.from_numpy(np_target)
+                # TODO: This assumes the data received only as one channel, so we can repeat the dimensions.
+                if np_data.shape[1] == self.n_channels:
+                    real_data = np_data # Do nothing as right amount of channels in input
+                else:
+                    real_data = np.repeat(np_data, self.n_channels, 1)
+                    # print('Original shape:', np_data.shape, 'View Shape:', real_data.shape)
+                data, target = torch.from_numpy(real_data), torch.from_numpy(np_target)
 
-                
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.vgg_model(data)
                 test_loss += self.loss_fn(output, target, reduction='sum').item() # sum up batch loss
@@ -227,7 +234,7 @@ model_urls = {
 # OG Implementation of VGG from PyTorch from 
 # https://pytorch.org/docs/stable/_modules/torch/nn/modules/module.html
 class _VGGG(nn.Module):
-    def __init__(self, features, num_classes=1000, init_weights=True):
+    def __init__(self, features, num_classes=1000, init_weights=True, **kwargs):
         super(_VGGG, self).__init__()
         self.features = features
         pool_size = 5
@@ -266,9 +273,9 @@ class _VGGG(nn.Module):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.constant_(m.bias, 0)
 
-def make_layers(cfg, batch_norm=False):
+def make_layers(cfg, batch_norm=False, n_channels=3):
     layers = []
-    in_channels = 3
+    in_channels = n_channels
     for v in cfg:
         if v == 'M':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
@@ -295,7 +302,7 @@ cfgs = {
 def _vgg(arch, cfg, batch_norm, pretrained, progress, **kwargs):
     if pretrained:
         kwargs['init_weights'] = False
-    model = _VGGG(make_layers(cfgs[cfg], batch_norm=batch_norm), **kwargs)
+    model = _VGGG(make_layers(cfgs[cfg], batch_norm=batch_norm, n_channels=kwargs['n_channels']), **kwargs)
     if pretrained:
         from torch.hub import load_state_dict_from_url
         state_dict = load_state_dict_from_url(model_urls[arch],
