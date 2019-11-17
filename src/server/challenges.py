@@ -64,7 +64,7 @@ class CIFARChallenge(Challenge):
 
 
 def get_challenges(data_root: str, download=DEFAULT_DATASET_DOWNLOAD):
-challenges = dict()
+    challenges = dict()
     challenges['mnist'] = MNISTChallenge(data_root=data_root, download=download)
     challenges['cifar'] = CIFARChallenge(data_root=data_root, download=download)
     return challenges
