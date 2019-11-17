@@ -23,10 +23,6 @@ if [ ! -d "$(dirname $SEED_CONTROLLER_FILE)" ]; then
   exit 1
 fi
 
-# Setting PIP_FIND_LINKS will allow to check the local
-# directory
-PIP_FIND_LINKS="$PY_CACHE_DIR $PIP_FIND_LINKS"
-
 #
 # Server configuration
 #
@@ -35,6 +31,11 @@ cd server
 pyenv local $SERVER_PY_VERSION
 python -m venv ".venvs/$SERVER_VENV_NAME"
 source ".venvs/$SERVER_VENV_NAME/bin/activate"
+
+# Create temporary file that pip will read in order to allow caching
+echo "[global]" >> .pip.config
+echo "cache-dir = $PY_CACHE_DIR" >> .pip.config
+export PIP_CONFIG_FILE=".pip.config"
 
 if [[ ! $(python --version) = "Python $SERVER_PY_VERSION" ]]; then
   echo "$(python --version)"
