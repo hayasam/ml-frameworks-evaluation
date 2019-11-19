@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
 # TODO: Check how these variables should be set
-EXPERIMENT_NAME="${EXPERIMENT_NAME:?}"
-CLIENT_VENV_NAME="${EXPERIMENT_NAME:?}"
+BUG_NAME="${BUG_NAME:?}"
+EVALUATION_TYPE="${EVALUATION_TYPE:?}"
+CLIENT_VENV_NAME="${BUG_NAME}_${EVALUATION_TYPE}"
 CLIENT_MANUAL_DEPENDENCY="${CLIENT_MANUAL_DEPENDENCY:?}"
 CLIENT_PY_VERSION="${CLIENT_PY_VERSION:?}"
-EVALUATION_TYPE="${EVALUATION_TYPE:?}"
 NUM_CLASSES="${NUM_CLASSES:?}"
 CHALLENGE="${CHALLENGE:?}"
 MODEL_LIBRARY="${MODEL_LIBRARY:?}"
@@ -36,6 +36,9 @@ if [ "$USE_BUILD_MKL" -eq 1 ]; then
   export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/builds/mkl"
 fi
 
+# Creating client directory
+mkdir -p "$CLIENT_LOG_DIR"
+
 #
 # Client configuration
 #
@@ -63,4 +66,4 @@ fi
 pip install "${MANUAL_WHL[0]}"
 echo "Starting client..."
 # Note: runs should maybe be parameterized?
-python trainer.py --evaluation-type "$EVALUATION_TYPE" --name "$EXPERIMENT_NAME" --challenge "$CHALLENGE" --model-library "$MODEL_LIBRARY" --model-name "$MODEL_NAME" --log-dir "$CLIENT_LOG_DIR" --runs "$NUMBER_OF_RUNS" --num-classes "$NUM_CLASSES"
+python trainer.py --evaluation-type "$EVALUATION_TYPE" --bug-name "$BUG_NAME" --challenge "$CHALLENGE" --model-library "$MODEL_LIBRARY" --model-name "$MODEL_NAME" --log-dir "$CLIENT_LOG_DIR" --runs "$NUMBER_OF_RUNS" --num-classes "$NUM_CLASSES"

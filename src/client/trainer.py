@@ -44,8 +44,8 @@ def test(model, test_loader, logger):
 
 def validate_args(args):
     from pathlib import Path
-    if args.name == '':
-        raise ValueError('--name', 'name must not be empty')
+    if args.bug_name == '':
+        raise ValueError('--bug-name', 'name must not be empty')
     if not Path(args.log_dir).exists():
         raise IOError('Log dir {} does no exist'.format(args.log_dir))
 
@@ -62,7 +62,7 @@ def parse_args():
     parser.add('--evaluation-type', type=str, choices=['buggy', 'corrected', 'automl'],
                         required=True)
     parser.add('--resume-run-at', type=int, help='what run to resume training from')
-    parser.add('--name', required=True, type=str)
+    parser.add('--bug-name', required=True, type=str)
     parser.add('--challenge',  default="mnist", type=str, required=True)
     parser.add('--data-server-endpoint', required=True, type=str, env_var='DATA_SERVER_ENDPOINT')
     # TODO: Put this as a choice (maybe dynamic?)
@@ -100,9 +100,10 @@ def run_experiment():
         if not check_cuda_availability(args['model_library']):
             raise ValueError("CUDA was requested but CUDA is not available")
 
-    EXPERIMENT_NAME = '{}_{}'.format(args['name'], args['evaluation_type'])
-    run_identifier = EvaluationRunIdentifier(name=args['name'], evaluation_type=args['evaluation_type'], challenge=args['challenge'],  lib_name=args['model_library'], model_name=args['model_name'])
-    logger = ExperimentLogger(EXPERIMENT_NAME, **args)
+    bug_evaluation_name = '{}_{}'.format(args['bug_name'], args['evaluation_type'])
+    run_identifier = EvaluationRunIdentifier(name=args['bug_name'], evaluation_type=args['evaluation_type'], challenge=args['challenge'],  lib_name=args['model_library'], model_name=args['model_name'])
+    run_identifier_name = EvaluationRunIdentifier.seed_identifier(run_identifier)
+    logger = ExperimentLogger(run_identifier_name, **args)
 
     # Get server connection
     socket, context = connect_server(args['data_server_endpoint'])
