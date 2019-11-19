@@ -7,6 +7,13 @@ or for the server
 
 
 ## Running a client
+
+### Prerequisites
+You should have the following docker volumes created:
+1. `pip-cache`: Pip caching directory, to avoid downloading same dependencies when relaunching a server.
+2. `results`: Contains the metrics recolted by the server (and the client, technically)
+3. `build-vol`: Contains the builds of the libraries to use.
+
 Configuration takes place with environment variables. Look at the template file `envs/template.env`, which contains these parameters:
 <pre>
 BUG_NAME=EXPERIMENT_NAME
@@ -23,9 +30,9 @@ USE_CUDA=True
 </pre>
 There are also the following environment variables that need to be added when launching an evaluation:
 1. `CHALLENGE`, denotes the name of the challenge to use
-2. `NUM_CLASSES` denotes the output size of the network to build, if the network supports it.
+2. `NUM_CLASSES` denotes the output size of the network to build, if the network supports it. Tied to `CHALLENGE` usually.
 3. `MODEL_NAME` denotes the name of the model to use
-`sudo docker run --name <EXPERIMENT_NAME> --mount source=pip-cache,target=/pip_cache --mount source=results,target=/results --mount source=build-vol,target=/builds --gpus all --env-file <EXPERIMENT_NAME>.env -it emiliorivera/ml-frameworks:eval100_client`
+`sudo docker run --rm --mount source=pip-cache,target=/pip_cache --mount source=results,target=/results --mount source=build-vol,target=/builds --gpus all --env-file /path/to/env/buggy.env --env CHALLENGE=NAME_OF_CHALLENGE --env NUM_CLASSES=NUMBER_OF_POSSIBLE_CLASSES --env MODEL_NAME=MODEL_TO_USE -it emiliorivera/ml-frameworks:eval100_client`
 
 ## Running a server
 
