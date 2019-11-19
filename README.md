@@ -5,6 +5,7 @@ The `Dockerfile` build context should be the `src` folder:
 or for the server
 `sudo docker build --tag emiliorivera/ml-frameworks:eval100_server --file Dockerfile.server src`
 
+_Update the `.dockerignore` file if need be, for example if the amount of files sent to the docker daemon during build is too large._
 
 ## Running a client
 
