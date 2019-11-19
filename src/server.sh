@@ -5,19 +5,13 @@
 PY_CACHE_DIR=${PY_CACHE_DIR:-/pip_cache}
 SERVER_PY_VERSION="${SERVER_PY_VERSION:-3.6.8}"
 SERVER_VENV_NAME="server-venv"
-SERVER_LOG_FILE="${SERVER_LOG_FILE:?}"
-SEED_CONTROLLER_FILE="${SEED_CONTROLLER_FILE:?}"
 DATA_SERVER_DATA_ROOT="${DATA_SERVER_DATA_ROOT:?}"
+METRICS_LOG_DIR="${METRICS_LOG_DIR:-/results/server}"
+SEED_CONTROLLER_FILE="${SEED_CONTROLLER_FILE:-/results/server/seed_control}"
+SERVER_LOG_FILE="${METRICS_LOG_DIR}/${SERVER_LOG_FILE:-server.log}"
 
-if [ ! -d "${METRICS_LOG_DIR:?}" ]; then
-  echo "Specified directory for logs does not exist!"
-  exit 1
-fi
-
-if [ ! -d "$(dirname $SERVER_LOG_FILE)" ]; then
-  echo "Specified directory for server log file does not exist!"
-  exit 1
-fi
+# Creating server directory
+mkdir -p "$METRICS_LOG_DIR"
 
 if [ ! -d "$(dirname $SEED_CONTROLLER_FILE)" ]; then
   echo "Specified directory for seed controller file does not exist!"
