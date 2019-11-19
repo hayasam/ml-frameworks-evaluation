@@ -7,22 +7,23 @@ or for the server
 
 
 ## Running a client
-Configuration takes place with environment variables. Use these parameters:
+Configuration takes place with environment variables. Look at the template file `envs/template.env`, which contains these parameters:
 <pre>
-EXPERIMENT_NAME=EXPERIMENT_NAME
-CLIENT_VENV_NAME=EXPERIMENT_NAME
+BUG_NAME=EXPERIMENT_NAME
 CLIENT_MANUAL_DEPENDENCY=COMMIT_SHA
 CLIENT_PY_VERSION=3.5.6
-EVALUATION_TYPE=corrected
-CHALLENGE=mnist
+EVALUATION_TYPE=
 MODEL_LIBRARY=pytorch
-MODEL_NAME=Net
-CLIENT_LOG_DIR=/results
-NUMBER_OF_RUNS=10
+CLIENT_LOG_DIR=/results/client
+NUMBER_OF_RUNS=2
 PY_CACHE_DIR=/pip_cache
 DATA_SERVER_ENDPOINT=tcp://IP_ADRESS_OF_SERVER:90002
 USE_BUILD_MKL=1
 USE_CUDA=True
 </pre>
+There are also the following environment variables that need to be added when launching an evaluation:
+1. `CHALLENGE`, denotes the name of the challenge to use
+2. `NUM_CLASSES` denotes the output size of the network to build, if the network supports it.
+3. `MODEL_NAME` denotes the name of the model to use
 
 `sudo docker run --name <EXPERIMENT_NAME> --mount source=pip-cache,target=/pip_cache --mount source=results,target=/results --mount source=build-vol,target=/builds --gpus all --env-file <EXPERIMENT_NAME>.env -it emiliorivera/ml-frameworks:eval100_client`
