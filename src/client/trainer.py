@@ -18,6 +18,15 @@ from sklearn.metrics import (accuracy_score, f1_score, precision_score,
 def log_params(model, logger):
     logger.parameters(model.get_params_str())
 
+def log_data_received(logger, seed, train_data, test_data):
+    s = 'With seed {}, hashes are: {}'.format(seed, _dataset_hash(train_data, test_data))
+    logger.data(s)
+
+# TODO: Move somewhere
+def _dataset_hash(train_set, test_set):
+    h_msg = 'Train x: {} - Train y: {} - Test x: {} - Test y: {}'.format(*[hash(bytes(x)) for x in [*train_set, *test_set]])
+    return h_msg
+
 def set_local_seed(seed_info, **kwargs):
     try:
         import torch
@@ -125,6 +134,7 @@ def run_experiment():
         data_params = model.get_data_params()
         logger.status('Requesting data from server')
         train_data, test_data = server_interactions.prepare_data_for_run(socket, run_identifier, run, current_seed, data_params)
+        log_data_received(logger=logger, seed=current_seed, train_data=train_data, test_data=test_data)
         logger.status('Received data from server')
 
         # TODO: Turn back on if necessary

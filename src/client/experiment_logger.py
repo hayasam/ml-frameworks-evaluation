@@ -30,6 +30,12 @@ class ExperimentLogger(object):
         self.metrics_logger.addHandler(self.metrics_log_handler)
         self.metrics_logger.setLevel(logging.DEBUG)
 
+        self.data_logger = self.base_logger.getChild('data')
+        # Need to cast to str because of python 3.5
+        self.data_log_handler = logging.FileHandler(str(self.bp / '{}.data.log'.format(self.name)))
+        self.data_logger.addHandler(self.data_log_handler)
+        self.data_logger.setLevel(logging.DEBUG)
+
         self.base_logger.setLevel(logging.DEBUG)
         self.base_log_handler = logging.StreamHandler()
         self.base_log_handler.setFormatter(logging.Formatter('%(asctime)s | %(name)s | %(message)s'))
@@ -47,6 +53,10 @@ class ExperimentLogger(object):
     def metrics(self, *args, **kwargs):
         self.metrics_logger.debug('run {}'.format(self.current_run))
         self.metrics_logger.debug(*args, **kwargs)
+    
+    def data(self, *args, **kwargs):
+        self.data_logger.debug('run {}'.format(self.current_run))
+        self.data_logger.debug(*args, **kwargs)
     
     def status(self, *args, **kwargs):
         self.base_logger.debug(*args, **kwargs)
