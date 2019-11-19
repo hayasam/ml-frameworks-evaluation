@@ -123,6 +123,7 @@ def run_experiment():
 
     for run in range(args['resume_run_at'] or 0, args['runs']):
         current_seed = seed[run]
+        logger.current_run = run
         # Local seed is indexed at the run
         set_local_seed(current_seed)
         model_creation_args = {'use_gpu': args['use_cuda'], 'num_classes': args['num_classes']}
@@ -130,7 +131,6 @@ def run_experiment():
         model = ModelStore.get_model_for_name(library=args['model_library'], name=args['model_name'], **model_creation_args)
         model.initialize_weights(current_seed)
 
-        logger.current_run = run
         data_params = model.get_data_params()
         logger.status('Requesting data from server')
         train_data, test_data = server_interactions.prepare_data_for_run(socket, run_identifier, run, current_seed, data_params)
