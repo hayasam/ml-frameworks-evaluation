@@ -102,7 +102,7 @@ def run_experiment():
 
     bug_evaluation_name = '{}_{}'.format(args['bug_name'], args['evaluation_type'])
     run_identifier = EvaluationRunIdentifier(name=args['bug_name'], evaluation_type=args['evaluation_type'], challenge=args['challenge'],  lib_name=args['model_library'], model_name=args['model_name'])
-    run_identifier_name = EvaluationRunIdentifier.seed_identifier(run_identifier)
+    run_identifier_name = EvaluationRunIdentifier.run_identifier(run_identifier)
     logger = ExperimentLogger(run_identifier_name, **args)
 
     # Get server connection
