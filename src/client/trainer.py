@@ -24,8 +24,14 @@ def log_data_received(logger, seed, train_data, test_data):
 
 # TODO: Move somewhere
 def _dataset_hash(train_set, test_set):
-    h_msg = 'Train x: {} - Train y: {} - Test x: {} - Test y: {}'.format(*[hash(bytes(x)) for x in [*train_set, *test_set]])
+    h_msg = 'Train x: {} - Train y: {} - Test x: {} - Test y: {}'.format(*[_numpy_array_hash(x) for x in [*train_set, *test_set]])
     return h_msg
+
+def _numpy_array_hash(arr):
+    import hashlib
+    m = hashlib.sha256()
+    m.update(arr.data)
+    return m.digest().hex()
 
 def set_local_seed(seed_info, **kwargs):
     try:
