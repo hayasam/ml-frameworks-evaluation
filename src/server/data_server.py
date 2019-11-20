@@ -41,8 +41,14 @@ def shuffle_dataset(x, y, seed):
     return x[shuffled_ix], y[shuffled_ix]
 
 def _dataset_hash(train_set, test_set):
-    h_msg = 'Train x: {} - Train y: {} - Test x: {} - Test y: {}'.format(*[hash(bytes(x)) for x in [*train_set, *test_set]])
+    h_msg = 'Train x: {} - Train y: {} - Test x: {} - Test y: {}'.format(*[_numpy_array_hash(x) for x in [*train_set, *test_set]])
     return h_msg
+
+def _numpy_array_hash(arr):
+    import hashlib
+    m = hashlib.sha256()
+    m.update(arr.data)
+    return m.digest().hex()
 
 # TODO: Challenges (or another class) should provide a method accepting a seed and deterministically return the train/test sets instead of defining it here
 def prepare_data_for_run(run_identifier: EvaluationRunIdentifier, run: int, seed: int, train_batch_size: int, test_batch_size: int, **kwargs):
