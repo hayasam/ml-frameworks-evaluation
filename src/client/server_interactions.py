@@ -19,14 +19,14 @@ def create_calculated_metrics_message(run_identifier: EvaluationRunIdentifier, r
 
 
 def prepare_data_for_run(socket, run_identifier: EvaluationRunIdentifier, run: int, current_client_seed: int,  data_params: dict):
-    data_query_obj = create_data_query(run_identifier=run_identifier, run=run, current_client_seed=current_client_seed, data_params=data_params)
+    data_query_obj = _create_data_query(run_identifier=run_identifier, run=run, current_client_seed=current_client_seed, data_params=data_params)
     print('Sending data query object:', data_query_obj)
     socket.send_pyobj(data_query_obj)
     msg = socket.recv_pyobj()
     train_data, test_data = msg
     return train_data, test_data
 
-def create_data_query(run_identifier: EvaluationRunIdentifier, run: int, current_client_seed: int, data_params: dict):
+def _create_data_query(run_identifier: EvaluationRunIdentifier, run: int, current_client_seed: int, data_params: dict):
     obj = {'type': 'data', 'run_identifier': run_identifier, 'run': run, 'seed': current_client_seed, **data_params}
     return obj
 
