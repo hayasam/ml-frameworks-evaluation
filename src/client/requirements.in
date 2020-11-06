@@ -1,0 +1,7 @@
+joblib
+numpy
+pyzmq
+scikit-learn
+scipy
+sklearn
+ConfigArgParse

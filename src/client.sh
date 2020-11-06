@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+source /etc/profile.d/conda.sh
+conda activate ${CONDA_TRAIN_ENV:-train}
+
 # TODO: Check how these variables should be set
 BUG_NAME="${BUG_NAME:?}"
 EVALUATION_TYPE="${EVALUATION_TYPE:?}"
@@ -15,21 +18,11 @@ NUMBER_OF_RUNS="${NUMBER_OF_RUNS:?}"
 PY_CACHE_DIR=${PY_CACHE_DIR:-/pip_cache}
 DATA_SERVER_ENDPOINT="${DATA_SERVER_ENDPOINT:?}"
 USE_BUILD_MKL="${USE_BUILD_MKL:-0}"
+BUILD_DIR="${BUILD_DIR:?}"
 
 # Setting PIP_FIND_LINKS will allow to check the local
 # directory
 PIP_FIND_LINKS="$PY_CACHE_DIR $PIP_FIND_LINKS"
-
-# TODO: Put this in its own function in other file
-if [ -z "${BUILD_DIR+x}" ]; then
-  BUILD_DIR="/builds/$CUDA_VERSION"
-  if [ -z "${CUDA_VERSION+x}" ]; then
-    echo 'Need to set env variable CUDA_VERSION if BUILD_DIR is not set'
-    echo 'exiting...'
-    exit 1
-  fi
-  echo "BUILD_DIR not set, using value $BUILD_DIR"
-fi
 
 if [ "$USE_BUILD_MKL" -eq 1 ]; then
   echo "Adding /builds/mkl to LD_LIBRARY_PATH"
@@ -53,17 +46,15 @@ echo "[global]" >> .pip.config
 echo "cache-dir = $PY_CACHE_DIR" >> .pip.config
 export PIP_CONFIG_FILE=".pip.config"
 
-pip install ../shared
-pip install --upgrade pip
-pip install -r partial_requirements.txt
-# Need also to install the built library
 MANUAL_WHL=( $(find $BUILD_DIR -type f -name "*$CLIENT_MANUAL_DEPENDENCY*.whl") )
 if [ "${#MANUAL_WHL[@]}" -ne 1 ]; then
   echo "MANUAL_WHL has more than one entry (#{aaa[@]})"
   exit 1
 fi
 
-pip install "${MANUAL_WHL[0]}"
+# Intall everything in one go
+pip install ./shared ${MANUAL_WHL[0]} -r ./client/requirements.in
+
 echo "Starting client..."
 # Note: runs should maybe be parameterized?
 python trainer.py --evaluation-type "$EVALUATION_TYPE" --bug-name "$BUG_NAME" --challenge "$CHALLENGE" --model-library "$MODEL_LIBRARY" --model-name "$MODEL_NAME" --log-dir "$CLIENT_LOG_DIR" --runs "$NUMBER_OF_RUNS" --num-classes "$NUM_CLASSES"
