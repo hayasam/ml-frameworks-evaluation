@@ -20,7 +20,7 @@ EVALUATION_TYPE=
 MODEL_LIBRARY=pytorch
 CLIENT_LOG_DIR=/results/client
 NUMBER_OF_RUNS=2
-PY_CACHE_DIR=/pip_cache
+PY_CACHE_DIR=/pip-cache
 DATA_SERVER_ENDPOINT=tcp://IP_ADRESS_OF_SERVER:90002
 USE_BUILD_MKL=1
 USE_CUDA=True
@@ -29,7 +29,7 @@ There are also the following environment variables that need to be added when la
 1. `CHALLENGE`, denotes the name of the challenge to use
 2. `NUM_CLASSES` denotes the output size of the network to build, if the network supports it. Tied to `CHALLENGE` usually.
 3. `MODEL_NAME` denotes the name of the model to use
-`sudo docker run --rm --mount source=pip-cache,target=/pip_cache --mount source=results,target=/results --mount source=build-vol,target=/builds --gpus all --env-file /path/to/env/buggy.env --env CHALLENGE=NAME_OF_CHALLENGE --env NUM_CLASSES=NUMBER_OF_POSSIBLE_CLASSES --env MODEL_NAME=MODEL_TO_USE -it emiliorivera/ml-frameworks:eval100_client`
+`sudo docker run --rm --mount source=pip-cache,target=/pip-cache --mount source=results,target=/results --mount source=build-vol,target=/builds --gpus all --env-file /path/to/env/buggy.env --env CHALLENGE=NAME_OF_CHALLENGE --env NUM_CLASSES=NUMBER_OF_POSSIBLE_CLASSES --env MODEL_NAME=MODEL_TO_USE -it emiliorivera/ml-frameworks:eval100_client`
 
 ## Running a server
 
@@ -40,10 +40,10 @@ You should have the following docker volumes created:
 3. `data`: Contains the data for the challenges (datasets)
 
 Here is the following preferred command in order to launch a server:
-`sudo docker run --name eval100_server --mount source=pip-cache,target=/pip_cache --mount source=results,target=/results --mount source=data,target=/data --gpus all --env DATA_SERVER_DATA_ROOT=/data -it emiliorivera/ml-frameworks:eval100_server`
+`sudo docker run --name eval100_server --mount source=pip-cache,target=/pip-cache --mount source=results,target=/results --mount source=data,target=/data --gpus all --env DATA_SERVER_DATA_ROOT=/data -it emiliorivera/ml-frameworks:eval100_server`
 
 The default values for the following parameters are set:
-1. `PY_CACHE_DIR` to `/pip_cache`
+1. `PY_CACHE_DIR` to `/pip-cache`
 2. `METRICS_LOG_DIR` to `/results/server`
 3. `SEED_CONTROLLER_FILE` to `/results/server/seed_control`
 4. `SERVER_LOG_FILE` to `$METRICS_LOGDIR/server.log`}"

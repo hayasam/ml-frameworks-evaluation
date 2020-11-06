@@ -19,7 +19,7 @@ for n in "${EXPERIMENTS_DIR[@]}"; do
             cat "$envfile_path"
             echo "======"
 
-            echo docker run --name "${exp_name}_${evaluationtype}_${model}" --mount source=pip-cache,target=/pip_cache --mount source=results,target=/results --mount source=build-vol,target=/builds --gpus all --env-file "$envfile_path" --env MODEL_NAME="$model" --env CHALLENGE="$CHALLENGE" --env NUM_CLASSES="$NUM_CLASSES" -it emiliorivera/ml-frameworks:eval100_client
+            echo docker run --name "${exp_name}_${evaluationtype}_${model}" --mount source=pip-cache,target=/pip-cache --mount source=results,target=/results --mount source=build-vol,target=/builds --gpus all --env-file "$envfile_path" --env MODEL_NAME="$model" --env CHALLENGE="$CHALLENGE" --env NUM_CLASSES="$NUM_CLASSES" -it emiliorivera/ml-frameworks:eval100_client
         done
     done
 done

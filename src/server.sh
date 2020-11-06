@@ -2,7 +2,7 @@
 
 # TODO: Maybe check if dependencies are already satisfied
 # Set PY_CACHE_DIR
-PY_CACHE_DIR=${PY_CACHE_DIR:-/pip_cache}
+PY_CACHE_DIR=${PY_CACHE_DIR:-/pip-cache}
 SERVER_PY_VERSION="${SERVER_PY_VERSION:-3.6.8}"
 SERVER_VENV_NAME="server-venv"
 DATA_SERVER_DATA_ROOT="${DATA_SERVER_DATA_ROOT:?}"
