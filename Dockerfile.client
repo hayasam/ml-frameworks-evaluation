@@ -1,50 +1,15 @@
-FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu16.04
+ARG BASE_IMAGE_VERSION
+FROM emiliorivera/pytorch-lttng:${BASE_IMAGE_VERSION}
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        cmake \
-        git \
-        curl \
-        ca-certificates \
-        libjpeg-dev \
-        libpng-dev \
-        nano \
-        ssh-client \
-        make build-essential \
-        libssl-dev zlib1g-dev libbz2-dev libreadline-dev\
-        libsqlite3-dev wget curl llvm libncurses5-dev\
-        xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
-
-
-RUN curl -o ~/miniconda.sh -O  https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh  && \
-     chmod +x ~/miniconda.sh && \
-     ~/miniconda.sh -b -p /opt/conda && \
-     rm ~/miniconda.sh && \
-     /opt/conda/bin/conda clean -ya
-
-# ADD /eval-repo-key /
-# RUN chmod 600 /eval-repo-key && \
-#         mkdir -p /etc/ssh/ && \
-#         echo "IdentityFile /eval-repo-key" >> /etc/ssh/ssh_config && \
-#         echo "StrictHostKeyChecking no" >> /etc/ssh/ssh_config && \
-#         git clone git@github.com:EmilioRivera/ml-frameworks-evaluation.git
-
-RUN /opt/conda/bin/conda install -y mkl mkl-include && \
-        MKL_PATH=$(dirname $(find /opt -type f -name libmkl_intel_lp64.so -print -quit))
-
-# Setup pyenv for multiple python versions
-SHELL ["/bin/bash", "-c"]
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$MKL_PATH PYENV_ROOT=/opt/.pyenv PATH=/opt/.pyenv/shims:/opt/.pyenv/bin:/opt/conda/bin:$PATH PYENV_SHELL=bash
-RUN curl -L https://raw.githubusercontent.com/EmilioRivera/pyenv-installer/master/bin/pyenv-installer | bash
-
-# Add pyenv shims to path
-ARG PY35VERSION=3.5.6
-ARG PY36VERSION=3.6.8
-# Setup needed python versions
-RUN pyenv rehash 2>/dev/null && pyenv install ${PY35VERSION} && pyenv install ${PY36VERSION}
+SHELL [ "/bin/bash", "-c" ]
+ENV CONDA_TRAIN_ENV=train
+RUN source /etc/profile.d/conda.sh && \
+    conda create --channel defaults --channel pytorch --name "${CONDA_TRAIN_ENV}" --file /build/conda_build_requirements.txt
 
 WORKDIR /ml-frameworks-evaluation
 
-COPY . .
+ADD src/client client
+ADD src/shared shared
+ADD src/client.sh .
 
 ENTRYPOINT [ "/ml-frameworks-evaluation/client.sh" ]

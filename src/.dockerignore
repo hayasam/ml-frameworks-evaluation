@@ -1,4 +1,0 @@
-server/.venv*
-client/.venvs*
-server/data
-server/test_datasets.py

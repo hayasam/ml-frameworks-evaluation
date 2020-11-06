@@ -1,0 +1,6 @@
+src/server/.venv*
+src/client/.venvs*
+src/server/data
+src/server/test_datasets.py
+/envs
+/results
