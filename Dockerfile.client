@@ -32,11 +32,11 @@ ENV CLIENT_PYTHON_VERSION $CLIENT_PYTHON_VERSION
 RUN source /etc/profile.d/conda.sh && \
     conda create -y --name "${CONDA_TRAIN_ENV}" python="${CLIENT_PYTHON_VERSION:?}"
 
+LABEL python_version=${CLIENT_PYTHON_VERSION} base_image=${BASE_IMAGE}
 WORKDIR /ml-frameworks-evaluation
 
 ADD src/client client
 ADD src/shared shared
 ADD src/client.sh .
 
-LABEL python_version=${CLIENT_PYTHON_VERSION} base_image=${BASE_IMAGE}
 ENTRYPOINT [ "/ml-frameworks-evaluation/client.sh" ]
