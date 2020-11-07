@@ -7,3 +7,4 @@ sudo docker build -f Dockerfile.client --build-arg BASE_IMAGE_VERSION=py379-cu10
 sudo docker build -f Dockerfile.client --build-arg BASE_IMAGE_VERSION=py367-cu101 --tag emiliorivera/ml-frameworks-evaluation-client:py367-cu101 .
 
 # Build the server
+sudo docker build -f Dockerfile.server --tag emiliorivera/ml-frameworks-evaluation-server .
