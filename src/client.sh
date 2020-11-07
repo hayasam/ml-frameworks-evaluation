@@ -24,15 +24,11 @@ CLIENT_LOG_DIR="${CLIENT_LOG_DIR:?}"
 PY_CACHE_DIR=${PY_CACHE_DIR:-/pip-cache}
 BUILD_DIR="${BUILD_DIR:?}"
 CONFIG_DIR="${CONFIG_DIR:?}"
+INSTALL_MKL=${INSTALL_MKL:0}
 
 # Setting PIP_FIND_LINKS will allow to check the local
 # directory
 PIP_FIND_LINKS="$PY_CACHE_DIR $PIP_FIND_LINKS"
-
-if [ "$USE_BUILD_MKL" -eq 1 ]; then
-  echo "Adding /builds/mkl to LD_LIBRARY_PATH"
-  export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/builds/mkl"
-fi
 
 # Creating client directory
 mkdir -p "$CLIENT_LOG_DIR"
@@ -65,20 +61,20 @@ if [ ! -d "${CONFIG_BUG_DIR}" ]; then
   exit 1
 fi
 
-if [ -e "${CONFIG_BUG_DIR}/requirements.txt" ]; then
+if [ -f "${CONFIG_BUG_DIR}/requirements.txt" ]; then
   # Try installing it
   pip install -r "${CONFIG_BUG_DIR}/requirements.txt"
 else
   # Create a bug specific requirements.txt
   # Bug specific requirements.in
-  if [ -e "${CONFIG_BUG_DIR}/requirements.in" ]; then
+  if [ -f "${CONFIG_BUG_DIR}/requirements.in" ]; then
     pip install -r "${CONFIG_BUG_DIR}/requirements.in"
     # Save output so next runner can take it
     pip freeze -l > "${CONFIG_BUG_DIR}/requirements.txt"
-  elif [ -e ./client/requirements.in ]; then
+  elif [ -f /ml-frameworks-evaluation/client/requirements.in ]; then
     # fall back on client requirements.in
     # which does not specify versions
-    pip install -r ./client/requirements.in
+    pip install -r /ml-frameworks-evaluation/client/requirements.in
     # Save output so next runner can take it
     pip freeze -l > "${CONFIG_BUG_DIR}/requirements.txt"
   else
@@ -89,8 +85,20 @@ else
   echo "${EVALUATION_TYPE}" > "${CONFIG_BUG_DIR}/setup_by.txt"
 fi
 
+# Damn MKL...
+if [ "$INSTALL_MKL" -eq 1 ]; then
+  echo "Installing MKL..."
+  conda install mkl
+  MKL_PATH=$(dirname $(find ${CONDA_PREFIX:-/opt} -type f -name libmkl_intel_lp64.so -print -quit))
+  export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/$MKL_PATH"
+elif [ "$USE_BUILD_MKL" -eq 1 ]; then
+  echo "Adding /builds/mkl to LD_LIBRARY_PATH"
+  export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/builds/mkl"
+fi
+
+
 # Add additional dependencies
-pip install ./shared ${MANUAL_WHL[0]}
+pip install /ml-frameworks-evaluation/shared ${MANUAL_WHL[0]}
 
 # Everything installed, export the environment information
 conda list --export > "${CONFIG_BUG_DIR}/${EVALUATION_TYPE}.export.txt"
