@@ -1,0 +1,2 @@
+deb http://ppa.launchpad.net/lttng/stable-2.12/ubuntu bionic main 
+deb-src http://ppa.launchpad.net/lttng/stable-2.12/ubuntu bionic main 

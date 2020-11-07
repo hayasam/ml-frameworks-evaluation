@@ -1,10 +1,36 @@
-ARG BASE_IMAGE_VERSION
-FROM emiliorivera/pytorch-lttng:${BASE_IMAGE_VERSION}
+ARG BASE_IMAGE="10.1-cudnn7-runtime-ubuntu18.04"
+
+FROM nvidia/cuda:${BASE_IMAGE}
+# TODO: Get from multi-stage build to avoid repetition
+
+ARG MINICONDA_INSTALLER_LOCATION="https://repo.anaconda.com/miniconda/Miniconda3-py38_4.8.3-Linux-x86_64.sh"
+ARG MINICONDA_INSTALLER_MD5="d63adf39f2c220950a063e0529d4ff74"
+
+# LTTng PPA
+COPY lttng.list /etc/apt/sources.list.d/lttng.list
+RUN apt-key adv --keyserver 'hkp://keyserver.ubuntu.com/' --recv C541B13BD43FA44A287E4161F4A7DFFC33739778 && \
+    apt-get update && apt install -y liblttng-ust-dev lttng-tools
+
+# Other build and possibly runtime dependencies
+RUN apt install -y --no-install-recommends build-essential git curl cmake ca-certificates libjpeg-dev libpng-dev
+
+# Install miniconda, adapted from https://github.com/ContinuumIO/docker-images/blob/master/miniconda/alpine/Dockerfile
+RUN curl -sL -o miniconda_installer.sh -O "${MINICONDA_INSTALLER_LOCATION}" && \
+    echo "${MINICONDA_INSTALLER_MD5} miniconda_installer.sh" > miniconda_installer.md5 && \
+    if [ $(md5sum -c miniconda_installer.md5| awk '{print $2}') != "OK" ] ; then echo "Failed to verify miniconda" ; exit 1; fi && \
+    chmod +x miniconda_installer.sh && \
+    ./miniconda_installer.sh -b -p /opt/conda && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> /root/.profile && \
+    rm miniconda_installer.sh && \
+    /opt/conda/bin/conda clean -yaf
 
 SHELL [ "/bin/bash", "-c" ]
-ENV CONDA_TRAIN_ENV=train
+ENV CONDA_TRAIN_ENV train
+ARG CLIENT_PYTHON_VERSION="3.7.9"
+ENV CLIENT_PYTHON_VERSION $CLIENT_PYTHON_VERSION
 RUN source /etc/profile.d/conda.sh && \
-    conda create --channel defaults --channel pytorch --name "${CONDA_TRAIN_ENV}" --file /build/conda_build_requirements.txt
+    conda create -y --name "${CONDA_TRAIN_ENV}" python="${CLIENT_PYTHON_VERSION:?}"
 
 WORKDIR /ml-frameworks-evaluation
 
@@ -12,4 +38,5 @@ ADD src/client client
 ADD src/shared shared
 ADD src/client.sh .
 
+LABEL python_version=${CLIENT_PYTHON_VERSION} base_image=${BASE_IMAGE}
 ENTRYPOINT [ "/ml-frameworks-evaluation/client.sh" ]
