@@ -13,6 +13,7 @@ DATA_SERVER_DATA_ROOT="${DATA_SERVER_DATA_ROOT:?}"
 METRICS_LOG_DIR="${METRICS_LOG_DIR:-/results/server}"
 SEED_CONTROLLER_FILE="${SEED_CONTROLLER_FILE:?}"
 SERVER_LOG_FILE="${SERVER_LOG_FILE:-${METRICS_LOG_DIR/server.log}}"
+USE_SINGLE_SEED="${USE_SINGLE_SEED:?}"
 
 # Creating server directory
 mkdir -p "$METRICS_LOG_DIR"
@@ -24,4 +25,4 @@ fi
 
 cd server
 echo "Starting server..."
-python data_server.py --metrics-log-dir "$METRICS_LOG_DIR" --server-log-file "$SERVER_LOG_FILE" --seed-controller-file "$SEED_CONTROLLER_FILE"  ${DEFAULT_MINIMAL_SEED_LEN:+ --default-minimal-seed-len $DEFAULT_MINIMAL_SEED_LEN} ${DEFAULT_MIN_SEED_VALUE:+ --default-min-seed-value $DEFAULT_MIN_SEED_VALUE} ${DEFAULT_MAX_SEED_VALUE:+ --default-max-seed-value $DEFAULT_MAX_SEED_VALUE}
+USE_SINGLE_SEED=${USE_SINGLE_SEED} python data_server.py --metrics-log-dir "$METRICS_LOG_DIR" --server-log-file "$SERVER_LOG_FILE" --seed-controller-file "$SEED_CONTROLLER_FILE"  ${DEFAULT_MINIMAL_SEED_LEN:+ --default-minimal-seed-len $DEFAULT_MINIMAL_SEED_LEN} ${DEFAULT_MIN_SEED_VALUE:+ --default-min-seed-value $DEFAULT_MIN_SEED_VALUE} ${DEFAULT_MAX_SEED_VALUE:+ --default-max-seed-value $DEFAULT_MAX_SEED_VALUE}

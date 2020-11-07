@@ -209,6 +209,7 @@ def parse_args():
     # Logging control
     parser.add('--server-log-file', type=str, default='server.log')
     parser.add('--metrics-log-dir', type=str, default='.logs')
+    parser.add('--use-single-seed', action='store_true', default=False, env_var='USE_SINGLE_SEED')
 
     args = parser.parse_args()
     parser.print_values()
@@ -219,7 +220,7 @@ def parse_args():
 if __name__ == "__main__":
     ARGS = parse_args()
     CHALLENGES = get_challenges(ARGS['data_root'])
-    non_existing_kwargs = {'seed_len': ARGS['default_minimal_seed_len'], 'min_val': ARGS['default_min_seed_value'], 'max_val': ARGS['default_max_seed_value']}
+    non_existing_kwargs = {'seed_len': ARGS['default_minimal_seed_len'], 'min_val': ARGS['default_min_seed_value'], 'max_val': ARGS['default_max_seed_value'], 'use_single_seed': ARGS['use_single_seed']}
     SEED_CONTROLLER = SeedController.from_saved_file(meta_seed=META_SEED, saved_file=ARGS['seed_controller_file'], **non_existing_kwargs)
     LOGGER_STORE = MetricsLoggerStore(base_path=ARGS['metrics_log_dir'])
     SERVER_LOGGER = logging.getLogger('server')
