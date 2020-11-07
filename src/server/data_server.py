@@ -220,7 +220,7 @@ if __name__ == "__main__":
     ARGS = parse_args()
     CHALLENGES = get_challenges(ARGS['data_root'])
     non_existing_kwargs = {'seed_len': ARGS['default_minimal_seed_len'], 'min_val': ARGS['default_min_seed_value'], 'max_val': ARGS['default_max_seed_value']}
-    SEED_CONTROLLER = SeedController.from_saved_file(met_seed=META_SEED, ARGS['seed_controller_file'], **non_existing_kwargs)
+    SEED_CONTROLLER = SeedController.from_saved_file(meta_seed=META_SEED, saved_file=ARGS['seed_controller_file'], **non_existing_kwargs)
     LOGGER_STORE = MetricsLoggerStore(base_path=ARGS['metrics_log_dir'])
     SERVER_LOGGER = logging.getLogger('server')
     SERVER_LOGGER.addHandler(logging.FileHandler(ARGS['server_log_file']))
