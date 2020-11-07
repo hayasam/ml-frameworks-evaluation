@@ -1,50 +1,24 @@
-FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu16.04
+# Server can have a specific version of Python
+# TODO: Change for a version that does not have cuda since not necessary
+FROM emiliorivera/pytorch-lttng:py379-cu101
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        cmake \
-        git \
-        curl \
-        ca-certificates \
-        libjpeg-dev \
-        libpng-dev \
-        nano \
-        ssh-client \
-        make build-essential \
-        libssl-dev zlib1g-dev libbz2-dev libreadline-dev\
-        libsqlite3-dev wget curl llvm libncurses5-dev\
-        xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
-
-
-RUN curl -o ~/miniconda.sh -O  https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh  && \
-     chmod +x ~/miniconda.sh && \
-     ~/miniconda.sh -b -p /opt/conda && \
-     rm ~/miniconda.sh && \
-     /opt/conda/bin/conda clean -ya
-
-# ADD /eval-repo-key /
-# RUN chmod 600 /eval-repo-key && \
-#         mkdir -p /etc/ssh/ && \
-#         echo "IdentityFile /eval-repo-key" >> /etc/ssh/ssh_config && \
-#         echo "StrictHostKeyChecking no" >> /etc/ssh/ssh_config && \
-#         git clone git@github.com:EmilioRivera/ml-frameworks-evaluation.git
-
-RUN /opt/conda/bin/conda install -y mkl mkl-include && \
-        MKL_PATH=$(dirname $(find /opt -type f -name libmkl_intel_lp64.so -print -quit))
-
-# Setup pyenv for multiple python versions
-SHELL ["/bin/bash", "-c"]
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$MKL_PATH PYENV_ROOT=/opt/.pyenv PATH=/opt/.pyenv/shims:/opt/.pyenv/bin:/opt/conda/bin:$PATH PYENV_SHELL=bash
-RUN curl -L https://raw.githubusercontent.com/EmilioRivera/pyenv-installer/master/bin/pyenv-installer | bash
-
-# Add pyenv shims to path
-ARG PY35VERSION=3.5.6
-ARG PY36VERSION=3.6.8
-# Setup needed python versions
-RUN pyenv rehash 2>/dev/null && pyenv install ${PY35VERSION} && pyenv install ${PY36VERSION}
-
+SHELL [ "/bin/bash", "-c" ]
+ENV CONDA_SERVER_ENV=server PYTHON_VERSION=3.7.9
 
 WORKDIR /ml-frameworks-evaluation
-COPY . .
+# Add this in order to rebuild the layer of python only if dependencies change
+COPY src/server/requirements.txt ./server/requirements.txt
+ADD src/shared shared
+
+RUN source /etc/profile.d/conda.sh && \
+    conda create --name "${CONDA_SERVER_ENV}" python=${PYTHON_VERSION} && \
+    conda activate ${CONDA_SERVER_ENV} && \
+    pip install ./shared -r ./server/requirements.txt -f https://download.pytorch.org/whl/torch_stable.html && \
+    pip freeze -l && \
+    conda list --export
+
+ADD src/server server
+ADD src/server.sh .
+
 
 ENTRYPOINT [ "/ml-frameworks-evaluation/server.sh" ]
