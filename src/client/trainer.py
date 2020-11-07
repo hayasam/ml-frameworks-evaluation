@@ -72,8 +72,6 @@ def parse_args():
                         help='number of epochs to train (default: 10)')
     parser.add('--use-cuda', action='store_true', default=False,
                         help='Forces CUDA training', env_var='USE_CUDA')
-    parser.add('--use-first-seed', action='store_true', default=False,
-                    help='Forces to an unique seed (the first returned by the server)', env_var='USE_FIRST_SEED')
     parser.add('--log-interval', type=int, default=10, metavar='N',
                         help='how many batches to wait before logging training status')
     parser.add('--evaluation-type', type=str, choices=['buggy', 'corrected', 'automl'],
@@ -130,10 +128,7 @@ def run_experiment():
     logger.status('Using seed value {}'.format(seed))
 
     for run in range(args['resume_run_at'] or 0, args['runs']):
-        if args['use_first_seed']:
-            current_seed = seed[0]
-        else:
-            current_seed = seed[run]
+        current_seed = seed[run]
         logger.current_run = run
         # Local seed is indexed at the run
         set_local_seed(current_seed)
