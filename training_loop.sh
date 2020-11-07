@@ -5,6 +5,8 @@ BASE_DIR=${1:?First argument needs to be path to folder containing experiment co
 EXPERIMENTS_DIR=( $(ls "$BASE_DIR") )
 CHALLENGE="cifar"
 NUM_CLASSES=10
+USE_FIRST_SEED=1
+
 
 for n in "${EXPERIMENTS_DIR[@]}"; do
     exp_name="${n##*/}"
@@ -19,7 +21,7 @@ for n in "${EXPERIMENTS_DIR[@]}"; do
             # cat "$envfile_path"
             # echo "======"
 
-            X_DO_LAUNCH=${X_DO_LAUNCH:-0} ./run_launcher.sh ${exp_name} ${evaluationtype} $model
+            USE_FIRST_SEED=${USE_FIRST_SEED} X_DO_LAUNCH=${X_DO_LAUNCH:-0} ./run_launcher.sh ${exp_name} ${evaluationtype} $model
             # echo docker run --name "${exp_name}_${evaluationtype}_${model}" --mount source=pip-cache,target=/pip-cache --mount source=results,target=/results --mount source=build-vol,target=/builds --gpus all --env-file "$envfile_path" --env MODEL_NAME="$model" --env CHALLENGE="$CHALLENGE" --env NUM_CLASSES="$NUM_CLASSES" -it emiliorivera/ml-frameworks:eval100_client
         done
     done

@@ -9,6 +9,7 @@ EVALUATION_TYPE="${EVALUATION_TYPE:?}"
 CLIENT_MANUAL_DEPENDENCY="${CLIENT_MANUAL_DEPENDENCY:?}"
 CLIENT_PY_VERSION="${CLIENT_PY_VERSION:?}"
 NUMBER_OF_RUNS="${NUMBER_OF_RUNS:?}"
+USE_FIRST_SEED="${USE_FIRST_SEED:?}"
 # Challenge information
 NUM_CLASSES="${NUM_CLASSES:?}"
 CHALLENGE="${CHALLENGE:?}"
@@ -106,4 +107,4 @@ conda list --explicit > "${CONFIG_BUG_DIR}/${EVALUATION_TYPE}.explicit.txt"
 
 echo "Starting client..."
 # Note: runs should maybe be parameterized?
-python trainer.py --evaluation-type "$EVALUATION_TYPE" --bug-name "$BUG_NAME" --challenge "$CHALLENGE" --model-library "$MODEL_LIBRARY" --model-name "$MODEL_NAME" --log-dir "$CLIENT_LOG_DIR" --runs "$NUMBER_OF_RUNS" --num-classes "$NUM_CLASSES"
+USE_FIRST_SEED=${USE_FIRST_SEED} python trainer.py --evaluation-type "$EVALUATION_TYPE" --bug-name "$BUG_NAME" --challenge "$CHALLENGE" --model-library "$MODEL_LIBRARY" --model-name "$MODEL_NAME" --log-dir "$CLIENT_LOG_DIR" --runs "$NUMBER_OF_RUNS" --num-classes "$NUM_CLASSES"

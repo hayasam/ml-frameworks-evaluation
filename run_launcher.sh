@@ -16,6 +16,7 @@ echo "Using evaluation type ${TYPE}"
 echo "Using model ${MODEL}"
 echo "Using challenge ${CHALLENGE:=cifar}"
 echo "Using number of runs ${NUMBER_OF_RUNS:=50}"
+echo "Using a single seed value ${USE_FIRST_SEED:=1}"
 echo "Using mount root ${MNT_ROOT:=/mnt/disks/experiments}"
 echo '=== Runtime ==='
 echo "Using server endpoint ${DATA_SERVER_ENDPOINT:=tcp://172.17.0.2:90002}"
@@ -41,7 +42,7 @@ X_TIME="$(date -u +"%FT%H%MZ")"
 X_FILE_SAVE_PATH="${MNT_ROOT}/configs/run_${BUG_NAME}_${TYPE}_${X_TIME}"
 echo "Will save to ${X_FILE_SAVE_PATH}"
 
-_X_COMMAND="docker run --name "$X_CONTAINER_NAME" -e EVALUATION_TYPE="${TYPE}" --env-file "$BUG_BASE_ENV" -e CHALLENGE=${CHALLENGE} -v "${MNT_ROOT}/configs:/configs" -v "${MNT_ROOT}/results:/results" -v "${MNT_ROOT}/builds:/builds:ro" --gpus all -e CLIENT_PY_VERSION=useless -e MODEL_NAME="$MODEL" -e NUMBER_OF_RUNS=${NUMBER_OF_RUNS} -e NUM_CLASSES=${NUM_CLASSES} -e DATA_SERVER_ENDPOINT=${DATA_SERVER_ENDPOINT} -e CLIENT_LOG_DIR=${CLIENT_LOG_DIR} -e BUILD_DIR=${BUILD_DIR} -e CONFIG_DIR=${CONFIG_DIR} -e INSTALL_MKL=${INSTALL_MKL} "${BUG_BASE_IMAGE:?}:${BUG_IMG_TAG}""
+_X_COMMAND="docker run --name "$X_CONTAINER_NAME" -e EVALUATION_TYPE="${TYPE}" --env-file "$BUG_BASE_ENV" -e USE_FIRST_SEED=${USE_FIRST_SEED} -e CHALLENGE=${CHALLENGE} -v "${MNT_ROOT}/configs:/configs" -v "${MNT_ROOT}/results:/results" -v "${MNT_ROOT}/builds:/builds:ro" --gpus all -e CLIENT_PY_VERSION=useless -e MODEL_NAME="$MODEL" -e NUMBER_OF_RUNS=${NUMBER_OF_RUNS} -e NUM_CLASSES=${NUM_CLASSES} -e DATA_SERVER_ENDPOINT=${DATA_SERVER_ENDPOINT} -e CLIENT_LOG_DIR=${CLIENT_LOG_DIR} -e BUILD_DIR=${BUILD_DIR} -e CONFIG_DIR=${CONFIG_DIR} -e INSTALL_MKL=${INSTALL_MKL} "${BUG_BASE_IMAGE:?}:${BUG_IMG_TAG}""
 
 if [ $X_DO_LAUNCH -eq 1 ]; then
     $_X_COMMAND
