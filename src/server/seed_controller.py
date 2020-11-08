@@ -33,10 +33,10 @@ class SeedController(object):
         return cls(meta_seed=meta_seed, **kwargs_non_exsiting)
 
     def create_seed(self, seed_identifier):
-        _vec = np.random.randint(self.value_min, self.value_max, self.value_count)
+        _vec = np.random.randint(self.min_seed_value, self.max_seed_value, self.seed_len)
         self._underlying[seed_identifier] = _vec
         if self.use_single_seed:
-            self._mapping[seed_identifier] = np.repeat(_vec[0], value_count)
+            self._mapping[seed_identifier] = np.repeat(_vec[0], self.seed_len)
         else:
             self._mapping[seed_identifier] = _vec.copy()
 

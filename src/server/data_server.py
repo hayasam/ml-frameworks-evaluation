@@ -143,12 +143,15 @@ def pair_stats_between_experiments(experiment_name_1: str, experiment_name_2: st
     print_pair_metrics_from_files(experiment_1_file, experiment_2_file, metrics)
 
 def save_current_info(signal, frame):
+    if 'SEED_CONTROLLER' in globals():
+        print('Saving SEED_CONTROLLER to {}'.format(ARGS['seed_controller_file']))
+        SEED_CONTROLLER.dump(ARGS['seed_controller_file'], overwrite=True)
+    SERVER_LOGGER.info('Server down and saved at {}'.format(str(datetime.now())))
+
+def save_current_info_and_exit(signal, frame):
     print('Captured exit signal')
     try:
-        if 'SEED_CONTROLLER' in globals():
-            print('Saving SEED_CONTROLLER to {}'.format(ARGS['seed_controller_file']))
-            SEED_CONTROLLER.dump(ARGS['seed_controller_file'], overwrite=True)
-        SERVER_LOGGER.info('Server down and saved at {}'.format(str(datetime.now())))
+        save_current_info(signal, frame)
     except Exception as e:
         print('ERROR in exit signal handler', e)
     finally:
@@ -176,7 +179,8 @@ def start_server():
 
     print("I: Service is ready at %s" % endpoint)
     # Setup interrupt handler
-    signal.signal(signal.SIGINT, save_current_info)
+    signal.signal(signal.SIGINT, save_current_info_and_exit)
+    signal.signal(signal.SIGUSR1, save_current_info)
     SERVER_LOGGER.info('Server up at {}'.format(str(datetime.now())))
 
     while True:
